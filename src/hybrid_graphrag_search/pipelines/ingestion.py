@@ -74,7 +74,9 @@ class IngestionPipeline:
                 ],
             )
             ordered_ids = [c["chunk_id"] for c in chunk_payloads]
-            self._retry("graph_link_next", self.graph_service.link_next_edges, doc.doc_id, ordered_ids)
+            self._retry(
+                "graph_link_next", self.graph_service.link_next_edges, doc.doc_id, ordered_ids
+            )
         timings["total_seconds"] = round(time.perf_counter() - t0, 4)
 
         return DocumentIngestionResponse(

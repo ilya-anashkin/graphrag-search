@@ -39,7 +39,7 @@ curl -X POST http://localhost:8000/api/search \
 
 ## Makefile targets
 - `make dev` – create virtualenv + install deps
-- `make fmt` – format with ruff
+- `make fmt` – format with ruff/black/isort
 - `make lint` – lint with ruff
 - `make test` – run pytest
 - `make up` / `make down` – docker-compose controls (include `--profile dashboards` to enable UI)

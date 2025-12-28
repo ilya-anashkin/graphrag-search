@@ -16,7 +16,9 @@ class EmbeddingService:
     def __init__(self, model: Optional[SentenceTransformer], settings: Settings) -> None:
         self.model = model
         self.settings = settings
-        logger.debug("Initialized EmbeddingService with model %s", self.settings.embedding_model_name)
+        logger.debug(
+            "Initialized EmbeddingService with model %s", self.settings.embedding_model_name
+        )
 
     def embed_chunks(self, chunks: List[str]) -> List[List[float]]:
         if not self.model:

@@ -2,7 +2,6 @@ from typing import Any, Dict
 from unittest.mock import MagicMock
 
 import pytest
-
 from hybrid_graphrag_search.services.opensearch_service import OpenSearchIndexService
 from hybrid_graphrag_search.settings import Settings
 
@@ -31,7 +30,10 @@ def test_create_index_if_not_exists_creates_when_missing(client: MagicMock, sett
     client.indices.create.assert_called_once()
     args, kwargs = client.indices.create.call_args
     assert kwargs["index"] == settings.opensearch_index
-    assert kwargs["body"]["mappings"]["properties"]["embedding"]["dimension"] == settings.embedding_dimension
+    assert (
+        kwargs["body"]["mappings"]["properties"]["embedding"]["dimension"]
+        == settings.embedding_dimension
+    )
 
 
 def test_search_bm25_builds_filter(client: MagicMock, settings: Settings):

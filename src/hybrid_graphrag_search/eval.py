@@ -144,7 +144,9 @@ def run_evaluation(dataset_path: Path, k: int, settings: Optional[Settings] = No
         try:
             seed_ids = _extract_ids(base)
             neighbors = graph_service.expand_neighbors(seed_ids, hops=1, limit_per_seed=5)
-            neighbor_hits = [{"_id": n["neighbor_chunk_id"], "_via": n.get("via_edges")} for n in neighbors]
+            neighbor_hits = [
+                {"_id": n["neighbor_chunk_id"], "_via": n.get("via_edges")} for n in neighbors
+            ]
             return base + neighbor_hits
         except Exception as exc:  # pragma: no cover - runtime guard
             logger.error("Graph expansion failed: %s", exc)

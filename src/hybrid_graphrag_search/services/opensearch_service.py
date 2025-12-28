@@ -17,7 +17,9 @@ class OpenSearchIndexService:
     def __init__(self, client: OpenSearch, settings: Settings) -> None:
         self.client = client
         self.settings = settings
-        logger.debug("Initialized OpenSearchIndexService with index %s", self.settings.opensearch_index)
+        logger.debug(
+            "Initialized OpenSearchIndexService with index %s", self.settings.opensearch_index
+        )
 
     def create_index_if_not_exists(self, index_name: Optional[str] = None) -> None:
         index = index_name or self.settings.opensearch_index
@@ -30,7 +32,9 @@ class OpenSearchIndexService:
         self.client.indices.create(index=index, body=body)
         logger.info("Index %s created with mapping", index)
 
-    def index_documents(self, documents: List[Dict[str, Any]], index_name: Optional[str] = None) -> None:
+    def index_documents(
+        self, documents: List[Dict[str, Any]], index_name: Optional[str] = None
+    ) -> None:
         index = index_name or self.settings.opensearch_index
         if not documents:
             logger.warning("index_documents called with empty batch")
@@ -87,9 +91,7 @@ class OpenSearchIndexService:
         response = self.client.search(index=index, body=body)
         return response.get("hits", {}).get("hits", [])
 
-    def get_by_ids(
-        self, ids: List[str], index_name: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_by_ids(self, ids: List[str], index_name: Optional[str] = None) -> List[Dict[str, Any]]:
         index = index_name or self.settings.opensearch_index
         if not ids:
             return []
@@ -118,7 +120,10 @@ class OpenSearchIndexService:
                     "body": {"type": "text"},
                     "tags": {"type": "keyword"},
                     "created_at": {"type": "date"},
-                    "embedding": {"type": "knn_vector", "dimension": self.settings.embedding_dimension},
+                    "embedding": {
+                        "type": "knn_vector",
+                        "dimension": self.settings.embedding_dimension,
+                    },
                 }
             },
         }

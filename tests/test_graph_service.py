@@ -2,7 +2,6 @@ from typing import Any, Dict, List
 from unittest.mock import MagicMock
 
 import pytest
-
 from hybrid_graphrag_search.services.graph_service import GraphService
 from hybrid_graphrag_search.settings import Settings
 
@@ -49,7 +48,9 @@ def test_link_next_edges_builds_pairs(driver: MagicMock, settings: Settings):
 
 def test_expand_neighbors_returns_data(driver: MagicMock, settings: Settings):
     session = driver.session.return_value
-    session.execute_read.return_value = [{"seed_id": "c1", "neighbor_chunk_id": "c2", "via_edges": ["NEXT"]}]
+    session.execute_read.return_value = [
+        {"seed_id": "c1", "neighbor_chunk_id": "c2", "via_edges": ["NEXT"]}
+    ]
     service = GraphService(driver, settings)
     res = service.expand_neighbors(["c1"], hops=1, limit_per_seed=5)
     assert res[0]["neighbor_chunk_id"] == "c2"

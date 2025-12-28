@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
-
 from hybrid_graphrag_search import main
 
 
