@@ -1,0 +1,81 @@
+{
+  "index": {
+    "settings": {
+      "index": {
+        "knn": true
+      },
+      "analysis": {
+        "filter": {
+          "ru_stop": {
+            "type": "stop",
+            "stopwords": "_russian_"
+          },
+          "ru_stemmer": {
+            "type": "stemmer",
+            "language": "russian"
+          },
+          "en_stemmer": {
+            "type": "stemmer",
+            "language": "english"
+          }
+        },
+        "analyzer": {
+          "ru_en_text_index": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "ru_stop", "ru_stemmer", "en_stemmer"]
+          },
+          "ru_en_text_search": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "ru_stop", "ru_stemmer", "en_stemmer"]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "rating": { "type": "integer" },
+        "movie": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "year": { "type": "integer" },
+        "country": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search"
+        },
+        "rating_ball": { "type": "float" },
+        "overview": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search"
+        },
+        "director": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search"
+        },
+        "screenwriter": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search"
+        },
+        "actors": {
+          "type": "text",
+          "analyzer": "ru_en_text_index",
+          "search_analyzer": "ru_en_text_search"
+        },
+        "url_logo": { "type": "keyword" }
+      }
+    }
+  },
+  "search": {
+    "vector_source_fields": ["movie", "overview", "country"]
+  }
+}
