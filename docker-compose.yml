@@ -1,83 +1,32 @@
-version: "3.9"
-
-networks:
-  app_net:
-    driver: bridge
-
 services:
   opensearch:
-    image: opensearchproject/opensearch:2.11.1
+    image: opensearchproject/opensearch:2.17.1
     container_name: opensearch
     environment:
-      discovery.type: single-node
-      bootstrap.memory_lock: "true"
-      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
-      plugins.security.disabled: "true"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=v}Jp&0b7@+UOL2I
     ports:
       - "9200:9200"
-      - "9600:9600"
-    volumes:
-      - ./data/opensearch:/usr/share/opensearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
-    networks:
-      - app_net
-
-  dashboards:
-    image: opensearchproject/opensearch-dashboards:2.11.1
-    container_name: opensearch-dashboards
-    environment:
-      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
-    ports:
-      - "5601:5601"
-    depends_on:
-      opensearch:
-        condition: service_healthy
-    networks:
-      - app_net
-    profiles: ["dashboards"]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/9200' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   neo4j:
-    image: neo4j:5.20
+    image: neo4j:5.26.0
     container_name: neo4j
     environment:
-      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-password}
-      NEO4J_PLUGINS: "[]"
+      - NEO4J_AUTH=neo4j/password
     ports:
       - "7474:7474"
       - "7687:7687"
-    volumes:
-      - ./data/neo4j/data:/data
-      - ./data/neo4j/logs:/logs
-      - ./data/neo4j/import:/var/lib/neo4j/import
-      - ./data/neo4j/plugins:/plugins
-    networks:
-      - app_net
-
-  # backend:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: hybrid-graphrag-backend
-  #   env_file: .env.compose
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     opensearch:
-  #       condition: service_healthy
-  #     neo4j:
-  #       condition: service_started
-  #   networks:
-  #     - app_net
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
-  #     interval: 20s
-  #     timeout: 5s
-  #     retries: 5
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password \"RETURN 1;\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

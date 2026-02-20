@@ -1,0 +1,22 @@
+{
+  "size": {{size}},
+  "_source": {
+    "excludes": ["{{vector_field}}"]
+  },
+  "query": {
+    "multi_match": {
+      "query": "{{query_text}}",
+      "type": "best_fields",
+      "operator": "and",
+      "minimum_should_match": "75%",
+      "fields": [
+        "movie^3",
+        "overview",
+        "actors",
+        "director",
+        "screenwriter",
+        "country"
+      ]
+    }
+  }
+}

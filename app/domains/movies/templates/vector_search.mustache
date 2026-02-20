@@ -1,0 +1,14 @@
+{
+  "size": {{size}},
+  "_source": {
+    "excludes": ["{{vector_field}}"]
+  },
+  "query": {
+    "knn": {
+      "{{vector_field}}": {
+        "vector": {{#toJson}}query_vector{{/toJson}},
+        "k": {{size}}
+      }
+    }
+  }
+}
