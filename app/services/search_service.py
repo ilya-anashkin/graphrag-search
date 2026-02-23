@@ -1,5 +1,6 @@
 """Application search service."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from app.adapters.neo4j_client import Neo4jAdapter
@@ -9,6 +10,7 @@ from app.core.domain_loader import DomainArtifacts
 from app.core.logging import get_logger
 from app.models.schemas import IndexDocumentRequest, SearchItem
 from app.services.embedding_service import EmbeddingService, EmbeddingServiceError
+from app.services.llm_service import LLMService, LLMServiceError
 
 CHANNEL_LEXICAL = "lexical"
 CHANNEL_VECTOR = "vector"
@@ -24,6 +26,7 @@ class SearchService:
         opensearch_adapter: OpenSearchAdapter,
         neo4j_adapter: Neo4jAdapter,
         embedding_service: EmbeddingService,
+        llm_service: LLMService,
         settings: Settings,
         domain_artifacts: DomainArtifacts,
     ) -> None:
@@ -32,9 +35,36 @@ class SearchService:
         self._opensearch_adapter = opensearch_adapter
         self._neo4j_adapter = neo4j_adapter
         self._embedding_service = embedding_service
+        self._llm_service = llm_service
         self._settings = settings
         self._domain_artifacts = domain_artifacts
         self._logger = get_logger(__name__)
+
+    async def answer_from_search_items(
+        self,
+        question: str,
+        items: list[SearchItem],
+    ) -> dict[str, str | None]:
+        """Generate answer from search items with configured LLM."""
+
+        try:
+            return await self._llm_service.answer_from_items(
+                question=question,
+                items=items,
+            )
+        except LLMServiceError as error:
+            self._logger.error("llm_answer_failed", error=str(error))
+            raise
+
+    def get_llm_model(self) -> str:
+        """Return active LLM model name."""
+
+        return self._settings.llm_model
+
+    def resolve_used_context_items(self, items_count: int) -> int:
+        """Resolve number of context items passed to LLM."""
+
+        return items_count
 
     async def index_document(self, payload: IndexDocumentRequest) -> bool:
         """Index a document and persist generated embedding vector."""
@@ -55,28 +85,43 @@ class SearchService:
     async def index_documents_bulk(
         self,
         payloads: list[IndexDocumentRequest],
-        batch_size: int | None = None,
     ) -> tuple[int, list[str]]:
         """Index multiple documents in batches and return indexed count and failed ids."""
 
         if not payloads:
             return 0, []
 
-        resolved_batch_size = batch_size or self._settings.bulk_index_batch_size
+        resolved_batch_size = max(1, self._settings.bulk_index_batch_size)
         indexed_count = 0
         failed_ids: list[str] = []
 
         for chunk in self._chunk_payloads(payloads=payloads, batch_size=resolved_batch_size):
+            chunk_texts = [self._build_embedding_text(document=item.document) for item in chunk]
             prepared_items: list[tuple[str, dict[str, Any], list[float]]] = []
-            for item in chunk:
-                embedding_text = self._build_embedding_text(document=item.document)
-                try:
-                    embedding = await self._embedding_service.embed_text(embedding_text)
-                except (EmbeddingServiceError, ValueError) as error:
-                    self._logger.error("embedding_build_failed", error=str(error), document_id=item.id)
-                    failed_ids.append(item.id)
-                    continue
-                prepared_items.append((item.id, item.document, embedding))
+            try:
+                chunk_embeddings = await self._embedding_service.embed_texts(chunk_texts)
+                if len(chunk_embeddings) != len(chunk):
+                    raise EmbeddingServiceError(
+                        "Embedding batch size mismatch. "
+                        f"Expected {len(chunk)}, got {len(chunk_embeddings)}"
+                    )
+                for item, embedding in zip(chunk, chunk_embeddings, strict=True):
+                    prepared_items.append((item.id, item.document, embedding))
+            except (EmbeddingServiceError, ValueError) as error:
+                self._logger.error(
+                    "embedding_batch_build_failed_fallback_to_single",
+                    error=str(error),
+                    batch_size=len(chunk),
+                )
+                for item in chunk:
+                    embedding_text = self._build_embedding_text(document=item.document)
+                    try:
+                        embedding = await self._embedding_service.embed_text(embedding_text)
+                    except (EmbeddingServiceError, ValueError) as single_error:
+                        self._logger.error("embedding_build_failed", error=str(single_error), document_id=item.id)
+                        failed_ids.append(item.id)
+                        continue
+                    prepared_items.append((item.id, item.document, embedding))
 
             if not prepared_items:
                 continue
@@ -143,9 +188,78 @@ class SearchService:
             lexical_weight=resolved_lexical_weight,
             vector_weight=resolved_vector_weight,
         )
+        filtered_items = self._filter_lexical_only_without_vector_signal(
+            items=weighted_items.values(),
+            vector_weight=resolved_vector_weight,
+        )
 
-        sorted_items = sorted(weighted_items.values(), key=lambda item: item.score, reverse=True)
-        return sorted_items[:limit]
+        sorted_items = sorted(filtered_items, key=lambda item: item.score, reverse=True)
+        limited_items = sorted_items[:limit]
+        if not self._settings.graph_enrichment_enabled:
+            return limited_items
+
+        return await self._enrich_with_graph_context(items=limited_items)
+
+    def _filter_lexical_only_without_vector_signal(
+        self,
+        items: Iterable[SearchItem],
+        vector_weight: float,
+    ) -> list[SearchItem]:
+        """Drop lexical-only documents when vector channel is enabled but has zero signal."""
+
+        if vector_weight <= 0:
+            return list(items)
+
+        filtered: list[SearchItem] = []
+        for item in items:
+            lexical_debug = item.debug.get(CHANNEL_LEXICAL, {})
+            vector_debug = item.debug.get(CHANNEL_VECTOR, {})
+            lexical_raw = float(lexical_debug.get("raw_score", 0.0))
+            vector_raw = float(vector_debug.get("raw_score", 0.0))
+            if lexical_raw > 0.0 and vector_raw == 0.0:
+                continue
+            filtered.append(item)
+        return filtered
+
+    async def _enrich_with_graph_context(self, items: list[SearchItem]) -> list[SearchItem]:
+        """Enrich search results with graph context from Neo4j."""
+
+        if not items:
+            return items
+
+        movie_ids = [item.id for item in items if item.id]
+        self._logger.info(
+            "graph_enrichment_started",
+            candidates=len(items),
+            movie_ids_count=len(movie_ids),
+            person_limit=self._settings.graph_context_person_limit,
+            related_movies_limit=self._settings.graph_related_movies_limit,
+            related_shared_people_limit=self._settings.graph_related_shared_people_limit,
+        )
+        graph_context_map = await self._neo4j_adapter.fetch_movie_graph_context(
+            movie_ids=movie_ids,
+            person_limit=self._settings.graph_context_person_limit,
+            related_limit=self._settings.graph_related_movies_limit,
+            shared_people_limit=self._settings.graph_related_shared_people_limit,
+        )
+        self._logger.info(
+            "graph_enrichment_context_loaded",
+            requested_movie_ids=len(movie_ids),
+            graph_context_count=len(graph_context_map),
+        )
+        enriched_count = 0
+        for item in items:
+            context = graph_context_map.get(item.id)
+            if context is not None:
+                item.payload["graph"] = context
+                enriched_count += 1
+        self._logger.info(
+            "graph_enrichment_finished",
+            total_items=len(items),
+            enriched_items=enriched_count,
+            not_enriched_items=len(items) - enriched_count,
+        )
+        return items
 
     def _resolve_weights(self, lexical_weight: float | None, vector_weight: float | None) -> tuple[float, float]:
         """Resolve effective weights and normalize them to sum 1."""

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     domains_root: str = Field(default="app/domains", alias="DOMAINS_ROOT")
 
     api_timeout_seconds: float = Field(default=5.0, alias="API_TIMEOUT_SECONDS")
+    opensearch_timeout_seconds: float = Field(default=60.0, alias="OPENSEARCH_TIMEOUT_SECONDS")
+    embedding_timeout_seconds: float = Field(default=120.0, alias="EMBEDDING_TIMEOUT_SECONDS")
     retry_attempts: int = Field(default=3, alias="RETRY_ATTEMPTS")
     retry_wait_seconds: float = Field(default=0.5, alias="RETRY_WAIT_SECONDS")
 
@@ -46,11 +48,29 @@ class Settings(BaseSettings):
     embedding_device: str = Field(default="cpu", alias="EMBEDDING_DEVICE")
     embedding_normalize: bool = Field(default=True, alias="EMBEDDING_NORMALIZE")
     embedding_preload_on_startup: bool = Field(default=True, alias="EMBEDDING_PRELOAD_ON_STARTUP")
+    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_embedding_endpoint: str = Field(default="/api/embed", alias="OLLAMA_EMBEDDING_ENDPOINT")
+    ollama_embedding_legacy_endpoint: str = Field(
+        default="/api/embeddings",
+        alias="OLLAMA_EMBEDDING_LEGACY_ENDPOINT",
+    )
+    llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
+    llm_model: str = Field(default="deepseek-r1:14b", alias="LLM_MODEL")
+    llm_base_url: str = Field(default="http://localhost:11434", alias="LLM_BASE_URL")
+    llm_ollama_generate_endpoint: str = Field(default="/api/generate", alias="LLM_OLLAMA_GENERATE_ENDPOINT")
+    llm_timeout_seconds: float = Field(default=120.0, alias="LLM_TIMEOUT_SECONDS")
+    llm_temperature: float = Field(default=0.2, alias="LLM_TEMPERATURE")
+    llm_preload_on_startup: bool = Field(default=False, alias="LLM_PRELOAD_ON_STARTUP")
 
     lexical_search_weight: float = Field(default=0.6, alias="LEXICAL_SEARCH_WEIGHT")
     vector_search_weight: float = Field(default=0.4, alias="VECTOR_SEARCH_WEIGHT")
     lexical_candidate_size: int = Field(default=40, alias="LEXICAL_CANDIDATE_SIZE")
     vector_candidate_size: int = Field(default=60, alias="VECTOR_CANDIDATE_SIZE")
+    graph_enrichment_enabled: bool = Field(default=True, alias="GRAPH_ENRICHMENT_ENABLED")
+    graph_context_person_limit: int = Field(default=5, alias="GRAPH_CONTEXT_PERSON_LIMIT")
+    graph_related_movies_limit: int = Field(default=3, alias="GRAPH_RELATED_MOVIES_LIMIT")
+    graph_related_shared_people_limit: int = Field(default=5, alias="GRAPH_RELATED_SHARED_PEOPLE_LIMIT")
+    graph_ingest_batch_size: int = Field(default=100, alias="GRAPH_INGEST_BATCH_SIZE")
     bulk_index_batch_size: int = Field(default=100, alias="BULK_INDEX_BATCH_SIZE")
 
 

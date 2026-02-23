@@ -42,10 +42,29 @@ class FakeSearchService:
 
         return True
 
-    async def index_documents_bulk(self, payloads: list[Any], batch_size: int | None = None) -> tuple[int, list[str]]:
+    async def index_documents_bulk(self, payloads: list[Any]) -> tuple[int, list[str]]:
         """Return successful bulk indexing state."""
 
         return len(payloads), []
+
+    async def answer_from_search_items(
+        self,
+        question: str,
+        items: list[SearchItem],
+    ) -> dict[str, str | None]:
+        """Return deterministic fake LLM answer."""
+
+        return {"answer": f"answer:{question}:{len(items)}", "think": "debug-think"}
+
+    def get_llm_model(self) -> str:
+        """Return fake model name."""
+
+        return "fake-llm"
+
+    def resolve_used_context_items(self, items_count: int) -> int:
+        """Return resolved used context items."""
+
+        return items_count
 
 
 @pytest.fixture
@@ -73,6 +92,14 @@ def test_ready_health(client: TestClient) -> None:
     response = client.get("/v1/health/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_ui_page(client: TestClient) -> None:
+    """Verify frontend debug UI page."""
+
+    response = client.get("/ui")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
 
 
 def test_search(client: TestClient) -> None:
@@ -122,8 +149,7 @@ def test_index_documents_bulk(client: TestClient) -> None:
         "items": [
             {"id": "movie-1", "document": {"movie": "Inception"}},
             {"id": "movie-2", "document": {"movie": "Interstellar"}},
-        ],
-        "batch_size": 2,
+        ]
     }
     response = client.post("/v1/documents/bulk", json=payload)
 
@@ -132,3 +158,28 @@ def test_index_documents_bulk(client: TestClient) -> None:
     assert data["total"] == 2
     assert data["indexed"] == 2
     assert data["failed"] == 0
+
+
+def test_ask(client: TestClient) -> None:
+    """Verify ask endpoint for LLM answer generation."""
+
+    payload: dict[str, Any] = {
+        "question": "О чем фильм?",
+        "items": [
+            {
+                "source": "opensearch",
+                "id": "movie-1",
+                "score": 1.0,
+                "payload": {"movie": "Inception"},
+                "debug": {},
+            }
+        ]
+    }
+    response = client.post("/v1/ask", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["model"] == "fake-llm"
+    assert data["used_items"] == 1
+    assert data["answer"].startswith("answer:")
+    assert data["think"] == "debug-think"

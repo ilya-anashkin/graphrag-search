@@ -14,7 +14,7 @@ Or full stack with API:
 docker compose -f docker-compose.integration.yml up --build
 ```
 
-For local embeddings (prototype mode), set in `.env`:
+For local `sentence-transformers` embeddings, set in `.env`:
 
 ```dotenv
 EMBEDDING_PROVIDER=local
@@ -34,6 +34,36 @@ If you need fully offline mode, switch to:
 EMBEDDING_PROVIDER=hash
 ```
 
+For Ollama embeddings (recommended for this prototype), run Ollama and set:
+
+```dotenv
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=qwen3-embedding:latest
+EMBEDDING_DIMENSION=1024
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBEDDING_ENDPOINT=/api/embed
+OLLAMA_EMBEDDING_LEGACY_ENDPOINT=/api/embeddings
+```
+
+For LLM answering via Ollama, set:
+
+```dotenv
+LLM_PROVIDER=ollama
+LLM_MODEL=deepseek-r1:14b
+LLM_BASE_URL=http://localhost:11434
+LLM_OLLAMA_GENERATE_ENDPOINT=/api/generate
+LLM_TIMEOUT_SECONDS=120
+LLM_TEMPERATURE=0.2
+LLM_PRELOAD_ON_STARTUP=false
+```
+
+Then pull both embedding and LLM models:
+
+```bash
+make infra-up
+make ollama-pull-models
+```
+
 ## API
 
 - `GET /v1/health/live`
@@ -41,6 +71,8 @@ EMBEDDING_PROVIDER=hash
 - `POST /v1/documents`
 - `POST /v1/documents/bulk`
 - `POST /v1/search`
+- `POST /v1/ask`
+- `GET /ui` (browser debug frontend)
 
 Index document example:
 
@@ -74,6 +106,31 @@ Search request example:
 ```
 
 Each search result contains `debug` with per-channel (`lexical`/`vector`) raw and weighted scores.
+Search results are also enriched with graph context from Neo4j in `payload.graph`.
+
+Ask request example (LLM answer from search output):
+
+```json
+{
+  "question": "Посоветуй фильм про космос",
+  "items": [
+    {
+      "source": "opensearch",
+      "id": "movie-30",
+      "score": 0.91,
+      "payload": {
+        "movie": "ВАЛЛ·И",
+        "overview": "..."
+      },
+      "debug": {}
+    }
+  ]
+}
+```
+
+`POST /v1/ask` response includes:
+- `answer`: plain text answer
+- `think`: optional model reasoning/debug text (if model returned `<think>...</think>`)
 
 Bulk indexing request example:
 
@@ -94,8 +151,7 @@ Bulk indexing request example:
         "overview": "Space travel and time dilation."
       }
     }
-  ],
-  "batch_size": 50
+  ]
 }
 ```
 
@@ -116,10 +172,18 @@ Run:
 make ingest-movies-data
 ```
 
+Graph ingestion script:
+
+```bash
+make ingest-movies-graph
+```
+
 ## Domain Config And Templates
 
 - Index config: `app/domains/movies/index_config.json`
 - Lexical mustache template: `app/domains/movies/templates/lexical_search.mustache`
 - Vector mustache template: `app/domains/movies/templates/vector_search.mustache`
+- Graph context cypher template: `app/domains/movies/templates/graph_context.cypher.mustache`
+- LLM answer prompt template: `app/domains/movies/templates/llm_answer_prompt.mustache`
 
 These artifacts are loaded during startup, and startup logs include loaded domain name and template metadata.

@@ -20,6 +20,7 @@ OPEN_SEARCH_ERROR_KEY = "error"
 OPEN_SEARCH_STATUS_CREATED = 201
 OPEN_SEARCH_STATUS_OK = 200
 OPEN_SEARCH_STATUS_RESOURCE_EXISTS = 400
+OPEN_SEARCH_STATUS_NOT_FOUND = 404
 OPEN_SEARCH_INDEX_PATH_TEMPLATE = "/{index}"
 OPEN_SEARCH_DOCUMENT_PATH_TEMPLATE = "/{index}/_doc/{document_id}?refresh=true"
 OPEN_SEARCH_BULK_PATH = "/_bulk?refresh=true"
@@ -42,7 +43,7 @@ class OpenSearchAdapter:
         self._logger = get_logger(__name__)
         self._client = httpx.AsyncClient(
             base_url=settings.opensearch_base_url,
-            timeout=settings.api_timeout_seconds,
+            timeout=settings.opensearch_timeout_seconds,
         )
 
     async def close(self) -> None:
@@ -98,6 +99,10 @@ class OpenSearchAdapter:
         index_body = self._build_index_body()
 
         try:
+            index_exists = await self._index_exists(path=index_path)
+            if index_exists:
+                return True
+
             payload = await self._request(
                 method="PUT",
                 path=index_path,
@@ -114,6 +119,23 @@ class OpenSearchAdapter:
         except httpx.HTTPError as error:
             self._logger.error("opensearch_ensure_index_failed", error=str(error))
             return False
+
+    async def _index_exists(self, path: str) -> bool:
+        """Check index existence via HEAD request."""
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(self._settings.retry_attempts),
+            wait=wait_fixed(self._settings.retry_wait_seconds),
+            reraise=True,
+        ):
+            with attempt:
+                response = await self._client.request(method="HEAD", url=path)
+                if response.status_code == OPEN_SEARCH_STATUS_OK:
+                    return True
+                if response.status_code == OPEN_SEARCH_STATUS_NOT_FOUND:
+                    return False
+                response.raise_for_status()
+        return False
 
     def _build_index_body(self) -> dict[str, Any]:
         """Build index body and enforce configured embedding dimension."""

@@ -6,9 +6,9 @@
   "query": {
     "multi_match": {
       "query": "{{query_text}}",
-      "type": "best_fields",
-      "operator": "and",
-      "minimum_should_match": "75%",
+      "type": "cross_fields",
+      "operator": "or",
+      "minimum_should_match": "60%",
       "fields": [
         "movie^3",
         "overview",

@@ -1,0 +1,41 @@
+UNWIND $movie_ids AS movie_id
+MATCH (m:{{movie_label}} {id: movie_id})
+OPTIONAL MATCH (d:{{director_label}})-[:{{directed_rel}}]->(m)
+OPTIONAL MATCH (s:{{screenwriter_label}})-[:{{wrote_rel}}]->(m)
+OPTIONAL MATCH (a:{{actor_label}})-[:{{acted_in_rel}}]->(m)
+OPTIONAL MATCH (c:{{country_label}})-[:{{produced_in_rel}}]->(m)
+WITH
+  m,
+  collect(DISTINCT d.name) AS directors,
+  collect(DISTINCT s.name) AS screenwriters,
+  collect(DISTINCT a.name) AS actors,
+  collect(DISTINCT c.name) AS countries
+CALL (m) {
+  OPTIONAL MATCH (m)<-[r1:{{acted_in_rel}}|{{directed_rel}}|{{wrote_rel}}]-(p)-[r2:{{acted_in_rel}}|{{directed_rel}}|{{wrote_rel}}]->(other:{{movie_label}})
+  WHERE other.id <> m.id
+  WITH
+    other,
+    count(DISTINCT p) AS shared_people_count,
+    collect(
+      DISTINCT {
+        person: p.name,
+        source_relation: type(r1),
+        related_relation: type(r2)
+      }
+    ) AS shared_people_relations
+  ORDER BY shared_people_count DESC, other.rating DESC, other.movie ASC
+  LIMIT $related_limit
+  RETURN collect({
+    id: other.id,
+    movie: other.movie,
+    shared_people_count: shared_people_count,
+    shared_people_relations: shared_people_relations[0..$shared_people_limit]
+  }) AS related_movies
+}
+RETURN
+  m.id AS movie_id,
+  directors,
+  screenwriters,
+  actors[0..$person_limit] AS actors,
+  countries,
+  related_movies
