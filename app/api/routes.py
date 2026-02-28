@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.logging import request_id_context
 from app.models.schemas import (
+    AskRequest,
+    AskResponse,
     HealthResponse,
     IndexDocumentRequest,
     IndexDocumentsBulkRequest,
@@ -13,6 +15,7 @@ from app.models.schemas import (
     SearchResponse,
 )
 from app.services.search_service import SearchService
+from app.services.llm_service import LLMServiceError
 
 router = APIRouter()
 
@@ -75,7 +78,6 @@ async def index_documents_bulk(
 
     indexed, failed_ids = await search_service.index_documents_bulk(
         payloads=payload.items,
-        batch_size=payload.batch_size,
     )
     total = len(payload.items)
     return IndexDocumentsBulkResponse(
@@ -84,4 +86,28 @@ async def index_documents_bulk(
         indexed=indexed,
         failed=total - indexed,
         failed_ids=failed_ids,
+    )
+
+
+@router.post("/ask", response_model=AskResponse)
+async def ask(payload: AskRequest, search_service: SearchService = Depends(get_search_service)) -> AskResponse:
+    """LLM answer endpoint based on search results context."""
+
+    if not payload.items:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="items must not be empty")
+
+    try:
+        llm_result = await search_service.answer_from_search_items(
+            question=payload.question,
+            items=payload.items,
+        )
+    except LLMServiceError as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+
+    return AskResponse(
+        request_id=request_id_context.get(),
+        answer=str(llm_result.get("answer", "")),
+        think=llm_result.get("think"),
+        model=search_service.get_llm_model(),
+        used_items=search_service.resolve_used_context_items(items_count=len(payload.items)),
     )

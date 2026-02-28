@@ -50,7 +50,6 @@ class IndexDocumentsBulkRequest(BaseModel):
     """Incoming bulk indexing payload."""
 
     items: list[IndexDocumentRequest] = Field(default_factory=list, description="Documents for bulk indexing.")
-    batch_size: int | None = Field(default=None, ge=1, le=1000, description="Bulk chunk size override.")
 
 
 class IndexDocumentsBulkResponse(BaseModel):
@@ -67,3 +66,20 @@ class HealthResponse(BaseModel):
     """Health endpoint response."""
 
     status: str = Field(..., description="Service health status.")
+
+
+class AskRequest(BaseModel):
+    """Incoming request for LLM answer generation."""
+
+    question: str = Field(..., min_length=1, description="User question for LLM.")
+    items: list[SearchItem] = Field(default_factory=list, description="Search results context for answer.")
+
+
+class AskResponse(BaseModel):
+    """LLM answer response payload."""
+
+    request_id: str = Field(..., description="Correlation request id.")
+    answer: str = Field(..., description="Generated answer.")
+    think: str | None = Field(default=None, description="Model internal reasoning text for debugging.")
+    model: str = Field(..., description="Model used for generation.")
+    used_items: int = Field(..., description="Number of context items provided to the model.")

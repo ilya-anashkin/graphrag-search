@@ -10,6 +10,46 @@
             "type": "stop",
             "stopwords": "_russian_"
           },
+          "movies_domain_stop": {
+            "type": "stop",
+            "stopwords": [
+              "актер",
+              "актеры",
+              "актриса",
+              "актрисы",
+              "фильм",
+              "фильма",
+              "фильме",
+              "фильмы",
+              "фильмов",
+              "кино",
+              "какой",
+              "какие",
+              "какая",
+              "какое",
+              "каком",
+              "каких",
+              "какую",
+              "найди",
+              "найти",
+              "подбери",
+              "посоветуй",
+              "посоветовать",
+              "покажи",
+              "показать",
+              "расскажи",
+              "рассказать",
+              "хочу",
+              "нужно",
+              "смотреть",
+              "снимался",
+              "снималась",
+              "снимались",
+              "снялся",
+              "снялась",
+              "снялись"
+            ]
+          },
           "ru_stemmer": {
             "type": "stemmer",
             "language": "russian"
@@ -23,12 +63,24 @@
           "ru_en_text_index": {
             "type": "custom",
             "tokenizer": "standard",
-            "filter": ["lowercase", "ru_stop", "ru_stemmer", "en_stemmer"]
+            "filter": [
+              "lowercase",
+              "ru_stop",
+              "movies_domain_stop",
+              "ru_stemmer",
+              "en_stemmer"
+            ]
           },
           "ru_en_text_search": {
             "type": "custom",
             "tokenizer": "standard",
-            "filter": ["lowercase", "ru_stop", "ru_stemmer", "en_stemmer"]
+            "filter": [
+              "lowercase",
+              "ru_stop",
+              "movies_domain_stop",
+              "ru_stemmer",
+              "en_stemmer"
+            ]
           }
         }
       }
@@ -76,6 +128,104 @@
     }
   },
   "search": {
-    "vector_source_fields": ["movie", "overview", "country"]
+    "vector_source_fields": ["movie", "overview"],
+    "graph": {
+      "movie_label": "Movie",
+      "actor_label": "Actor",
+      "director_label": "Director",
+      "screenwriter_label": "Screenwriter",
+      "country_label": "Country",
+      "acted_in_rel": "ACTED_IN",
+      "directed_rel": "DIRECTED",
+      "wrote_rel": "WROTE",
+      "produced_in_rel": "PRODUCED_IN"
+    },
+    "llm": {
+      "domain_schema": {
+        "entity": "MovieSearchResult",
+        "description": "Результат гибридного поиска фильма с графовым обогащением.",
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "Уникальный идентификатор фильма в формате movie-<id>."
+          },
+          "score": {
+            "type": "float",
+            "description": "Итоговый комбинированный score (lexical + vector)."
+          },
+          "payload": {
+            "type": "object",
+            "description": "Исходные атрибуты фильма из OpenSearch.",
+            "properties": {
+              "rating": {
+                "type": "integer",
+                "description": "Позиция фильма в рейтинге TOP."
+              },
+              "movie": {
+                "type": "string",
+                "description": "Название фильма."
+              },
+              "year": {
+                "type": "integer",
+                "description": "Год выпуска."
+              },
+              "country": {
+                "type": "string | list[string]",
+                "description": "Страна производства."
+              },
+              "rating_ball": {
+                "type": "float",
+                "description": "Оценка на kinopoisk.ru."
+              },
+              "overview": {
+                "type": "string",
+                "description": "Описание сюжета."
+              },
+              "director": {
+                "type": "string | list[string]",
+                "description": "Режиссер(ы)."
+              },
+              "screenwriter": {
+                "type": "string | list[string]",
+                "description": "Сценарист(ы)."
+              },
+              "actors": {
+                "type": "string | list[string]",
+                "description": "Ключевые актеры."
+              },
+              "url_logo": {
+                "type": "string",
+                "description": "URL постера/изображения."
+              },
+              "graph": {
+                "type": "object",
+                "description": "Графовые связи для reasoning.",
+                "properties": {
+                  "connections": {
+                    "type": "list[object]",
+                    "description": "Прямые связи фильма с сущностями.",
+                    "item_schema": {
+                      "entity_type": "string",
+                      "entity": "string",
+                      "relation": "string"
+                    }
+                  },
+                  "related_movies": {
+                    "type": "list[object]",
+                    "description": "Связанные фильмы по общим людям.",
+                    "item_schema": {
+                      "id": "string",
+                      "movie": "string",
+                      "shared_people_count": "integer",
+                      "shared_people_relations": "list[object(person,source_relation,related_relation)]"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

@@ -9,6 +9,11 @@ from typing import Any
 
 import httpx
 
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover
+    tqdm = None
+
 DEFAULT_DATASET_PATH = "app/domains/movies/example_data/kinopoisk-top250.jsonl"
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 DEFAULT_BULK_ENDPOINT = "/v1/documents/bulk"
@@ -90,9 +95,11 @@ async def send_bulk_batches(
     total_indexed = 0
     total_failed = 0
     failed_ids: list[str] = []
+    batches = chunk_items(items=payloads, batch_size=batch_size)
+    progress_bar = tqdm(total=len(batches), desc="OpenSearch bulk ingest", unit="batch") if tqdm else None
 
-    for batch in chunk_items(items=payloads, batch_size=batch_size):
-        request_payload = {"items": batch, "batch_size": batch_size}
+    for batch in batches:
+        request_payload = {"items": batch}
         response = await client.post(endpoint, json=request_payload)
         response.raise_for_status()
 
@@ -100,6 +107,11 @@ async def send_bulk_batches(
         total_indexed += int(body.get("indexed", 0))
         total_failed += int(body.get("failed", 0))
         failed_ids.extend([str(item) for item in body.get("failed_ids", [])])
+        if progress_bar is not None:
+            progress_bar.update(1)
+
+    if progress_bar is not None:
+        progress_bar.close()
 
     return total_indexed, total_failed, failed_ids
 

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import RequestResponseEndpoint
 
 from app.adapters.neo4j_client import Neo4jAdapter
@@ -13,7 +14,9 @@ from app.core.config import Settings, get_settings
 from app.core.domain_loader import DomainLoader
 from app.core.logging import configure_logging, get_logger
 from app.core.request_id import request_id_middleware
+from app.frontend.routes import STATIC_DIR, router as frontend_router
 from app.services.embedding_service import EmbeddingService
+from app.services.llm_service import LLMService
 from app.services.search_service import SearchService
 
 
@@ -36,15 +39,19 @@ class AppContainer:
             vector_source_fields=self.domain_artifacts.search_config.vector_source_fields,
             lexical_template_length=len(self.domain_artifacts.templates.lexical_search),
             vector_template_length=len(self.domain_artifacts.templates.vector_search),
+            graph_context_template_length=len(self.domain_artifacts.templates.graph_context_query),
+            llm_answer_prompt_length=len(self.domain_artifacts.templates.llm_answer_prompt),
         )
 
         self.opensearch_adapter = OpenSearchAdapter(settings=settings, domain_artifacts=self.domain_artifacts)
-        self.neo4j_adapter = Neo4jAdapter(settings=settings)
+        self.neo4j_adapter = Neo4jAdapter(settings=settings, domain_artifacts=self.domain_artifacts)
         self.embedding_service = EmbeddingService(settings=settings)
+        self.llm_service = LLMService(settings=settings, domain_artifacts=self.domain_artifacts)
         self.search_service = SearchService(
             opensearch_adapter=self.opensearch_adapter,
             neo4j_adapter=self.neo4j_adapter,
             embedding_service=self.embedding_service,
+            llm_service=self.llm_service,
             settings=settings,
             domain_artifacts=self.domain_artifacts,
         )
@@ -53,6 +60,7 @@ class AppContainer:
         """Warm up startup dependencies."""
 
         await self.embedding_service.preload_model()
+        await self.llm_service.preload_model()
 
     async def close(self) -> None:
         """Close all adapters."""
@@ -60,6 +68,7 @@ class AppContainer:
         await self.opensearch_adapter.close()
         await self.neo4j_adapter.close()
         await self.embedding_service.close()
+        await self.llm_service.close()
 
 
 def _resolve_search_service(request: Request) -> SearchService:
@@ -101,6 +110,8 @@ def create_app() -> FastAPI:
 
     app.dependency_overrides[get_search_service] = _resolve_search_service
     app.include_router(router, prefix=settings.api_v1_prefix)
+    app.include_router(frontend_router)
+    app.mount("/ui/static", StaticFiles(directory=STATIC_DIR), name="ui-static")
     return app
 
 

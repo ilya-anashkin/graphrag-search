@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GraphRAG Search Debug UI</title>
+    <link rel="stylesheet" href="/ui/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel panel-left">
+        <header class="panel-header">
+          <h1>Search Debug</h1>
+          <p>Поиск и выдача</p>
+        </header>
+
+        <form id="search-form" class="controls">
+          <label>
+            Query
+            <input id="query" name="query" type="text" value="Про космос" required />
+          </label>
+          <div class="row">
+            <label>
+              Limit
+              <input id="limit" name="limit" type="number" min="1" max="50" value="10" />
+            </label>
+            <label>
+              Lexical
+              <input id="lexical-weight" name="lexical_weight" type="number" min="0" max="1" step="0.1" value="0.6" />
+            </label>
+            <label>
+              Vector
+              <input id="vector-weight" name="vector_weight" type="number" min="0" max="1" step="0.1" value="0.4" />
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit" id="search-btn">Search</button>
+            <button type="button" id="ask-btn">Ask Model</button>
+          </div>
+        </form>
+
+        <section class="block">
+          <div class="block-title">Search Response</div>
+          <pre id="search-response" class="code"></pre>
+        </section>
+      </section>
+
+      <section class="panel panel-right">
+        <header class="panel-header">
+          <h2>LLM Answer</h2>
+          <p>Ответ модели по результатам поиска</p>
+        </header>
+
+        <section class="block">
+          <div class="block-title">Answer</div>
+          <pre id="llm-answer" class="code"></pre>
+        </section>
+
+        <section class="block">
+          <div class="block-title">Think (debug)</div>
+          <pre id="llm-think" class="code"></pre>
+        </section>
+      </section>
+    </main>
+
+    <script src="/ui/static/app.js"></script>
+  </body>
+</html>
+
