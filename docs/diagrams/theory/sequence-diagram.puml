@@ -1,0 +1,63 @@
+@startuml
+' Hybrid Retrieval + GraphRAG + Rank Fusion — Sequence Diagram (technology-agnostic)
+
+skinparam shadowing false
+skinparam maxMessageSize 220
+skinparam wrapWidth 220
+skinparam sequenceMessageAlign center
+
+title Алгоритм гибридного извлечения и ранжирования (BM25 + Dense + GraphRAG)
+
+actor Client as client
+
+participant "Search API" as api
+participant "Query Orchestrator\n(конвейер поиска)" as orch
+participant "Lexical Retrieval\n(лексический поиск)" as lex
+participant "Dense Retrieval\n(векторный поиск)" as dense
+participant "Graph Expansion\n(GraphRAG)" as graph
+participant "Score Normalizer" as norm
+participant "Rank Fusion / Re-ranking\n(гибридный скоринг)" as fusion
+participant "Result Assembler\n(сборка ответа)" as assemble
+
+client -> api : search(q, filters?)
+api -> orch : handleQuery(q, filters?)
+
+== 1) Первичное извлечение кандидатов ==
+
+par Lexical path
+  orch -> lex : retrieveLexical(q, K_lex, filters)
+  lex --> orch : S_lex = {(chunk_id, score_lex)}
+end
+par Dense path
+  orch -> dense : encodeQuery(q) -> v_q
+  orch -> dense : retrieveDense(v_q, K_vec, filters)
+  dense --> orch : S_vec = {(chunk_id, score_vec)}
+end
+
+orch -> orch : S_seed = union(S_lex, S_vec)\nattach missing scores as 0
+
+== 2) GraphRAG: контекстное расширение ==
+
+orch -> graph : expand(S_seed.chunk_id,\nedge_types, depth=D, limits)
+graph --> orch : S_graph = {(chunk_id, score_graph, paths)}
+
+orch -> orch : S_all = union(S_seed, S_graph)
+
+== 3) Нормализация частных оценок ==
+
+orch -> norm : normalize(S_all.scores)\nlex, vec, graph
+norm --> orch : S_all = {(chunk_id, ŝ_lex, ŝ_vec, ŝ_graph)}
+
+== 4) Итоговое ранжирование ==
+
+orch -> fusion : rank(S_all, weights α,β,γ)\nscore = αŝ_lex + βŝ_vec + γŝ_graph
+fusion --> orch : RankedChunks = [chunk_id...] + breakdowns (optional)
+
+== 5) Сборка ответа ==
+
+orch -> assemble : fetchPayload(RankedChunks)\n(text/snippets/meta)\noptional doc-aggregation
+assemble --> orch : Response (ranked results + optional explanations)
+
+orch --> api : Response
+api --> client : ranked_results
+@enduml

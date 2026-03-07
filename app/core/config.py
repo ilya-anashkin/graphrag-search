@@ -68,7 +68,6 @@ class Settings(BaseSettings):
     vector_search_weight: float = Field(default=0.4, alias="VECTOR_SEARCH_WEIGHT")
     lexical_candidate_size: int = Field(default=40, alias="LEXICAL_CANDIDATE_SIZE")
     vector_candidate_size: int = Field(default=60, alias="VECTOR_CANDIDATE_SIZE")
-    graph_enrichment_enabled: bool = Field(default=True, alias="GRAPH_ENRICHMENT_ENABLED")
     graph_context_person_limit: int = Field(default=5, alias="GRAPH_CONTEXT_PERSON_LIMIT")
     graph_related_movies_limit: int = Field(default=3, alias="GRAPH_RELATED_MOVIES_LIMIT")
     graph_related_shared_people_limit: int = Field(

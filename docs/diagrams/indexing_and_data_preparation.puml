@@ -1,0 +1,44 @@
+@startuml
+title Подсистема индексации и подготовки данных
+
+actor "Клиент системы" as Client
+participant "FastAPI\nPOST /v1/documents/bulk" as API
+participant "SearchService\nindex_documents_bulk" as Service
+participant "EmbeddingService\nembed_texts / embed_text" as Emb
+participant "OpenSearchAdapter\nensure_index + bulk_index_documents" as OS
+participant "Neo4jAdapter\ningest_documents" as Neo
+database "OpenSearch" as OSDb
+database "Neo4j" as NeoDb
+
+Client -> API: POST /v1/documents/bulk {items:[...]}
+API -> Service: index_documents_bulk(payloads)
+
+loop for each service chunk (BULK_INDEX_BATCH_SIZE)
+  Service -> Service: build embedding_text from\ndomain vector_source_fields
+
+  Service -> Emb: embed_texts(chunk_texts)
+  alt embedding batch failed
+    Service -> Emb: embed_text(...) per item (fallback)
+  end
+
+  Service -> OS: bulk_index_documents(prepared_items)
+  OS -> OS: ensure_index()
+  OS -> OSDb: HEAD /{index}
+  alt index absent
+    OS -> OSDb: PUT /{index} (domain index config)
+  end
+  OS -> OSDb: POST /_bulk?refresh=true
+  OSDb --> OS: succeeded_ids, failed_ids
+
+  Service -> Neo: ingest_documents(rows for succeeded_ids)
+  Neo -> Neo: normalize rows by domain graph ingest field mapping
+  Neo -> NeoDb: run rendered graph_ingest Cypher template
+  NeoDb --> Neo: success/failure
+
+  Service -> Service: combine failures from\nembedding/OpenSearch/Neo4j
+end
+
+Service --> API: indexed, failed_ids
+API --> Client: IndexDocumentsBulkResponse
+
+@enduml

@@ -249,9 +249,6 @@ class SearchService:
 
         sorted_items = sorted(filtered_items, key=lambda item: item.score, reverse=True)
         limited_items = sorted_items[:limit]
-        if not self._settings.graph_enrichment_enabled:
-            return limited_items
-
         return await self._enrich_with_graph_context(items=limited_items)
 
     def _filter_lexical_only_without_vector_signal(
