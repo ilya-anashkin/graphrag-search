@@ -69,7 +69,11 @@ class EmbeddingService:
             )
             return
 
-        self._logger.info("embedding_preload_skipped", reason="provider_without_model_load", provider=self._provider)
+        self._logger.info(
+            "embedding_preload_skipped",
+            reason="provider_without_model_load",
+            provider=self._provider,
+        )
 
     async def close(self) -> None:
         """Close internal resources."""
@@ -216,7 +220,9 @@ class EmbeddingService:
         except EmbeddingServiceError:
             if fallback_path is None or fallback_payload is None:
                 raise
-            return await self._request_ollama_once(client=client, path=fallback_path, payload=fallback_payload)
+            return await self._request_ollama_once(
+                client=client, path=fallback_path, payload=fallback_payload
+            )
 
     async def _request_ollama_once(
         self,
@@ -241,9 +247,7 @@ class EmbeddingService:
                     return body
                 except httpx.HTTPStatusError as error:
                     if error.response.status_code == 404:
-                        raise EmbeddingServiceError(
-                            f"Ollama endpoint not found: {path}"
-                        ) from error
+                        raise EmbeddingServiceError(f"Ollama endpoint not found: {path}") from error
                     raise EmbeddingServiceError(f"Ollama HTTP error: {error}") from error
                 except httpx.HTTPError as error:
                     raise EmbeddingServiceError(f"Ollama request failed: {error}") from error
@@ -252,7 +256,9 @@ class EmbeddingService:
 
         raise EmbeddingServiceError("Ollama request failed after retries")
 
-    def _extract_ollama_vectors(self, response: dict[str, Any], expected_count: int) -> list[list[float]]:
+    def _extract_ollama_vectors(
+        self, response: dict[str, Any], expected_count: int
+    ) -> list[list[float]]:
         """Extract embedding vectors from Ollama response payload."""
 
         if OLLAMA_EMBED_RESPONSE_KEY in response:
@@ -271,9 +277,13 @@ class EmbeddingService:
         if OLLAMA_EMBEDDING_RESPONSE_KEY in response:
             values = response.get(OLLAMA_EMBEDDING_RESPONSE_KEY)
             if not isinstance(values, list):
-                raise EmbeddingServiceError("Ollama /api/embeddings returned invalid embedding format")
+                raise EmbeddingServiceError(
+                    "Ollama /api/embeddings returned invalid embedding format"
+                )
             if expected_count != 1:
-                raise EmbeddingServiceError("Legacy /api/embeddings endpoint does not support batch mode")
+                raise EmbeddingServiceError(
+                    "Legacy /api/embeddings endpoint does not support batch mode"
+                )
             return [[float(value) for value in values]]
 
         raise EmbeddingServiceError("Ollama response does not contain embedding vector")

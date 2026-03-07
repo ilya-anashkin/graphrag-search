@@ -131,7 +131,7 @@ def test_index_document(client: TestClient) -> None:
             "director": "Christopher Nolan",
             "screenwriter": "Christopher Nolan",
             "actors": "Leonardo DiCaprio",
-            "url_logo": "https://example.com/logo.jpg"
+            "url_logo": "https://example.com/logo.jpg",
         },
     }
     response = client.post("/v1/documents", json=payload)
@@ -173,7 +173,7 @@ def test_ask(client: TestClient) -> None:
                 "payload": {"movie": "Inception"},
                 "debug": {},
             }
-        ]
+        ],
     }
     response = client.post("/v1/ask", json=payload)
 

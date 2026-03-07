@@ -1,4 +1,4 @@
-"""Bulk ingest movies JSONL dataset into the API service."""
+"""Bulk ingest domain JSONL dataset into the API service."""
 
 from __future__ import annotations
 
@@ -9,12 +9,13 @@ from typing import Any
 
 import httpx
 
+from app.core.config import get_settings
+
 try:
     from tqdm import tqdm
 except ImportError:  # pragma: no cover
     tqdm = None
 
-DEFAULT_DATASET_PATH = "app/domains/movies/example_data/kinopoisk-top250.jsonl"
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 DEFAULT_BULK_ENDPOINT = "/v1/documents/bulk"
 DEFAULT_BATCH_SIZE = 25
@@ -23,12 +24,20 @@ DEFAULT_BATCH_SIZE = 25
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
 
-    parser = argparse.ArgumentParser(description="Ingest movies JSONL into API in bulk mode")
-    parser.add_argument("--file", default=DEFAULT_DATASET_PATH, help="Path to JSONL input file")
+    parser = argparse.ArgumentParser(description="Ingest domain JSONL into API in bulk mode")
+    parser.add_argument("--file", default=None, help="Path to JSONL input file")
     parser.add_argument("--api-base-url", default=DEFAULT_API_BASE_URL, help="API base URL")
-    parser.add_argument("--bulk-endpoint", default=DEFAULT_BULK_ENDPOINT, help="Bulk indexing endpoint path")
-    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Bulk batch size")
-    parser.add_argument("--timeout", type=float, default=30.0, help="HTTP request timeout in seconds")
+    parser.add_argument(
+        "--bulk-endpoint",
+        default=DEFAULT_BULK_ENDPOINT,
+        help="Bulk indexing endpoint path",
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Bulk batch size"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=30.0, help="HTTP request timeout in seconds"
+    )
     return parser.parse_args()
 
 
@@ -40,7 +49,30 @@ def _normalize_value(value: Any) -> Any:
     return value
 
 
-def build_document_payload(raw_item: dict[str, Any]) -> dict[str, Any]:
+def resolve_default_dataset_path() -> Path:
+    """Resolve default dataset path from active domain."""
+
+    settings = get_settings()
+    domain_dir = Path(settings.domains_root) / settings.domain_name
+    example_data_dir = domain_dir / "example_data"
+    if example_data_dir.exists():
+        candidates = sorted(example_data_dir.glob("*.jsonl"))
+        if candidates:
+            return candidates[0]
+
+    data_dir = domain_dir / "data"
+    if data_dir.exists():
+        candidates = sorted(data_dir.glob("*.jsonl"))
+        if candidates:
+            return candidates[0]
+
+    raise FileNotFoundError(
+        f"Default dataset for domain '{settings.domain_name}' not found. "
+        "Provide --file explicitly or add *.jsonl to example_data/ or data/."
+    )
+
+
+def build_document_payload(raw_item: dict[str, Any], domain_name: str) -> dict[str, Any]:
     """Map source JSONL record to API bulk document payload."""
 
     source_id = str(raw_item.get("id", "")).strip()
@@ -53,13 +85,15 @@ def build_document_payload(raw_item: dict[str, Any]) -> dict[str, Any]:
             continue
         document[key] = value
 
-    return {
-        "id": f"movie-{source_id}",
-        "document": document,
-    }
+    if "-" in source_id:
+        normalized_id = source_id
+    else:
+        normalized_id = f"{domain_name}-{source_id}"
+
+    return {"id": normalized_id, "document": document}
 
 
-def load_payloads(path: Path) -> list[dict[str, Any]]:
+def load_payloads(path: Path, domain_name: str) -> list[dict[str, Any]]:
     """Read JSONL file and convert rows into API payloads."""
 
     payloads: list[dict[str, Any]] = []
@@ -71,7 +105,7 @@ def load_payloads(path: Path) -> list[dict[str, Any]]:
 
             try:
                 item = json.loads(stripped)
-                payloads.append(build_document_payload(raw_item=item))
+                payloads.append(build_document_payload(raw_item=item, domain_name=domain_name))
             except (json.JSONDecodeError, ValueError) as error:
                 raise ValueError(f"Invalid JSONL line {line_number}: {error}") from error
 
@@ -96,7 +130,9 @@ async def send_bulk_batches(
     total_failed = 0
     failed_ids: list[str] = []
     batches = chunk_items(items=payloads, batch_size=batch_size)
-    progress_bar = tqdm(total=len(batches), desc="OpenSearch bulk ingest", unit="batch") if tqdm else None
+    progress_bar = (
+        tqdm(total=len(batches), desc="OpenSearch bulk ingest", unit="batch") if tqdm else None
+    )
 
     for batch in batches:
         request_payload = {"items": batch}
@@ -120,9 +156,10 @@ async def main() -> None:
     """CLI entrypoint."""
 
     args = parse_args()
-    dataset_path = Path(args.file)
+    settings = get_settings()
+    dataset_path = Path(args.file) if args.file else resolve_default_dataset_path()
 
-    payloads = load_payloads(path=dataset_path)
+    payloads = load_payloads(path=dataset_path, domain_name=settings.domain_name)
     if not payloads:
         print("No records found in input file")
         return

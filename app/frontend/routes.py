@@ -16,4 +16,3 @@ async def debug_ui() -> FileResponse:
     """Serve browser debug UI page."""
 
     return FileResponse(INDEX_FILE)
-

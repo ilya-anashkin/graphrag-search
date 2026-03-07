@@ -20,7 +20,9 @@ def _resolve_request_id(request: Request, request_id_header: str) -> str:
     return str(uuid4())
 
 
-async def request_id_middleware(request: Request, call_next: RequestHandler, settings: Settings) -> Response:
+async def request_id_middleware(
+    request: Request, call_next: RequestHandler, settings: Settings
+) -> Response:
     """Set request id context and propagate it in response headers."""
 
     request_id = _resolve_request_id(request, settings.request_id_header)
