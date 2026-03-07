@@ -128,7 +128,7 @@
     }
   },
   "search": {
-    "vector_source_fields": ["movie", "overview"],
+    "vector_source_fields": ["overview"],
     "graph": {
       "movie_label": "Movie",
       "actor_label": "Actor",
@@ -138,7 +138,19 @@
       "acted_in_rel": "ACTED_IN",
       "directed_rel": "DIRECTED",
       "wrote_rel": "WROTE",
-      "produced_in_rel": "PRODUCED_IN"
+      "produced_in_rel": "PRODUCED_IN",
+      "ingest": {
+        "title_field": "movie",
+        "overview_field": "overview",
+        "year_field": "year",
+        "rating_field": "rating",
+        "rating_ball_field": "rating_ball",
+        "url_logo_field": "url_logo",
+        "country_field": "country",
+        "director_field": "director",
+        "screenwriter_field": "screenwriter",
+        "actor_field": "actors"
+      }
     },
     "llm": {
       "domain_schema": {

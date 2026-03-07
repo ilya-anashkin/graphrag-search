@@ -76,11 +76,25 @@ class SearchService:
             self._logger.error("embedding_build_failed", error=str(error), document_id=payload.id)
             return False
 
-        return await self._opensearch_adapter.index_document(
+        opensearch_indexed = await self._opensearch_adapter.index_document(
             document_id=payload.id,
             document=payload.document,
             embedding=embedding,
         )
+        if not opensearch_indexed:
+            return False
+
+        graph_succeeded_ids, graph_failed_ids = await self._neo4j_adapter.ingest_documents(
+            rows=[{"id": payload.id, **payload.document}]
+        )
+        if graph_failed_ids or payload.id not in graph_succeeded_ids:
+            self._logger.error(
+                "graph_index_document_failed",
+                document_id=payload.id,
+                failed_ids=graph_failed_ids,
+            )
+            return False
+        return True
 
     async def index_documents_bulk(
         self,
@@ -118,7 +132,11 @@ class SearchService:
                     try:
                         embedding = await self._embedding_service.embed_text(embedding_text)
                     except (EmbeddingServiceError, ValueError) as single_error:
-                        self._logger.error("embedding_build_failed", error=str(single_error), document_id=item.id)
+                        self._logger.error(
+                            "embedding_build_failed",
+                            error=str(single_error),
+                            document_id=item.id,
+                        )
                         failed_ids.append(item.id)
                         continue
                     prepared_items.append((item.id, item.document, embedding))
@@ -126,9 +144,37 @@ class SearchService:
             if not prepared_items:
                 continue
 
-            succeeded_ids, chunk_failed_ids = await self._opensearch_adapter.bulk_index_documents(prepared_items)
-            indexed_count += len(succeeded_ids)
+            succeeded_ids, chunk_failed_ids = await self._opensearch_adapter.bulk_index_documents(
+                prepared_items
+            )
             failed_ids.extend(chunk_failed_ids)
+            if not succeeded_ids:
+                continue
+
+            succeeded_ids_set = set(succeeded_ids)
+            succeeded_docs = {
+                doc_id: document
+                for doc_id, document, _ in prepared_items
+                if doc_id in succeeded_ids_set
+            }
+            graph_succeeded_ids, graph_failed_ids = await self._neo4j_adapter.ingest_documents(
+                rows=[
+                    {"id": doc_id, **succeeded_docs[doc_id]}
+                    for doc_id in succeeded_ids
+                    if doc_id in succeeded_docs
+                ]
+            )
+            for failed_id in graph_failed_ids:
+                if failed_id not in failed_ids:
+                    failed_ids.append(failed_id)
+
+            graph_succeeded_set = set(graph_succeeded_ids)
+            for doc_id in succeeded_ids:
+                if doc_id in graph_succeeded_set:
+                    indexed_count += 1
+                else:
+                    if doc_id not in failed_ids:
+                        failed_ids.append(doc_id)
 
         return indexed_count, failed_ids
 
@@ -139,7 +185,9 @@ class SearchService:
     ) -> list[list[IndexDocumentRequest]]:
         """Split payloads into fixed-size chunks."""
 
-        return [payloads[index : index + batch_size] for index in range(0, len(payloads), batch_size)]
+        return [
+            payloads[index : index + batch_size] for index in range(0, len(payloads), batch_size)
+        ]
 
     def _build_embedding_text(self, document: dict[str, Any]) -> str:
         """Build embedding source text from configured domain fields."""
@@ -148,7 +196,11 @@ class SearchService:
         if not fields:
             return "\n".join(str(value) for value in document.values() if value is not None)
 
-        parts = [str(document.get(field, "")) for field in fields if document.get(field) not in (None, "")]
+        parts = [
+            str(document.get(field, ""))
+            for field in fields
+            if document.get(field) not in (None, "")
+        ]
         return "\n".join(parts)
 
     async def search(
@@ -173,7 +225,9 @@ class SearchService:
         lexical_limit = max(limit, self._settings.lexical_candidate_size)
         vector_limit = max(limit, self._settings.vector_candidate_size)
 
-        lexical_results = await self._opensearch_adapter.lexical_search(query=query, limit=lexical_limit)
+        lexical_results = await self._opensearch_adapter.lexical_search(
+            query=query, limit=lexical_limit
+        )
         vector_results = await self._opensearch_adapter.vector_search(
             query_vector=query_embedding,
             limit=vector_limit,
@@ -227,24 +281,24 @@ class SearchService:
         if not items:
             return items
 
-        movie_ids = [item.id for item in items if item.id]
+        item_ids = [item.id for item in items if item.id]
         self._logger.info(
             "graph_enrichment_started",
             candidates=len(items),
-            movie_ids_count=len(movie_ids),
+            item_ids_count=len(item_ids),
             person_limit=self._settings.graph_context_person_limit,
             related_movies_limit=self._settings.graph_related_movies_limit,
             related_shared_people_limit=self._settings.graph_related_shared_people_limit,
         )
-        graph_context_map = await self._neo4j_adapter.fetch_movie_graph_context(
-            movie_ids=movie_ids,
+        graph_context_map = await self._neo4j_adapter.fetch_graph_context(
+            item_ids=item_ids,
             person_limit=self._settings.graph_context_person_limit,
             related_limit=self._settings.graph_related_movies_limit,
             shared_people_limit=self._settings.graph_related_shared_people_limit,
         )
         self._logger.info(
             "graph_enrichment_context_loaded",
-            requested_movie_ids=len(movie_ids),
+            requested_item_ids=len(item_ids),
             graph_context_count=len(graph_context_map),
         )
         enriched_count = 0
@@ -261,18 +315,28 @@ class SearchService:
         )
         return items
 
-    def _resolve_weights(self, lexical_weight: float | None, vector_weight: float | None) -> tuple[float, float]:
+    def _resolve_weights(
+        self, lexical_weight: float | None, vector_weight: float | None
+    ) -> tuple[float, float]:
         """Resolve effective weights and normalize them to sum 1."""
 
         resolved_lexical_weight = (
             self._settings.lexical_search_weight if lexical_weight is None else lexical_weight
         )
-        resolved_vector_weight = self._settings.vector_search_weight if vector_weight is None else vector_weight
+        resolved_vector_weight = (
+            self._settings.vector_search_weight if vector_weight is None else vector_weight
+        )
 
         total_weight = resolved_lexical_weight + resolved_vector_weight
         if total_weight <= 0:
-            return self._settings.lexical_search_weight, self._settings.vector_search_weight
-        return resolved_lexical_weight / total_weight, resolved_vector_weight / total_weight
+            return (
+                self._settings.lexical_search_weight,
+                self._settings.vector_search_weight,
+            )
+        return (
+            resolved_lexical_weight / total_weight,
+            resolved_vector_weight / total_weight,
+        )
 
     def _normalize_channel_scores(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize channel scores with min-max scaling to [0, 1]."""
@@ -388,7 +452,9 @@ class SearchService:
                 float(channel_debug.get("normalized_score", 0.0)) + normalized_score
             )
             channel_debug["weight"] = weight
-            channel_debug["weighted_score"] = float(channel_debug.get("weighted_score", 0.0)) + weighted_score
+            channel_debug["weighted_score"] = (
+                float(channel_debug.get("weighted_score", 0.0)) + weighted_score
+            )
             existing_item.debug[channel] = channel_debug
             existing_item.score += weighted_score
             existing_item.debug["combined_score"] = existing_item.score

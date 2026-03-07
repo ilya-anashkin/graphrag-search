@@ -85,7 +85,9 @@ class OpenSearchAdapter:
             reraise=True,
         ):
             with attempt:
-                response = await self._client.post(path, content=payload.encode("utf-8"), headers=headers)
+                response = await self._client.post(
+                    path, content=payload.encode("utf-8"), headers=headers
+                )
                 response.raise_for_status()
                 if not response.content:
                     return {}
@@ -145,7 +147,10 @@ class OpenSearchAdapter:
 
         vector_field = self._settings.opensearch_vector_field
         if vector_field not in properties:
-            properties[vector_field] = {"type": VECTOR_TYPE, DIMENSION_KEY: self._settings.embedding_dimension}
+            properties[vector_field] = {
+                "type": VECTOR_TYPE,
+                DIMENSION_KEY: self._settings.embedding_dimension,
+            }
         elif properties[vector_field].get("type") == VECTOR_TYPE:
             properties[vector_field][DIMENSION_KEY] = self._settings.embedding_dimension
 
@@ -179,7 +184,11 @@ class OpenSearchAdapter:
             )
             return True
         except httpx.HTTPError as error:
-            self._logger.error("opensearch_index_document_failed", error=str(error), document_id=document_id)
+            self._logger.error(
+                "opensearch_index_document_failed",
+                error=str(error),
+                document_id=document_id,
+            )
             return False
 
     async def bulk_index_documents(
@@ -203,7 +212,9 @@ class OpenSearchAdapter:
         payload = "\n".join(ndjson_lines) + "\n"
 
         try:
-            response_payload = await self._request_ndjson(path=OPEN_SEARCH_BULK_PATH, payload=payload)
+            response_payload = await self._request_ndjson(
+                path=OPEN_SEARCH_BULK_PATH, payload=payload
+            )
         except httpx.HTTPError as error:
             self._logger.error("opensearch_bulk_index_failed", error=str(error))
             return [], [item[0] for item in items]
@@ -225,7 +236,9 @@ class OpenSearchAdapter:
     async def lexical_search(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Run lexical search using loaded mustache template."""
 
-        search_path = OPEN_SEARCH_SEARCH_TEMPLATE_PATH_TEMPLATE.format(index=self._settings.opensearch_index)
+        search_path = OPEN_SEARCH_SEARCH_TEMPLATE_PATH_TEMPLATE.format(
+            index=self._settings.opensearch_index
+        )
         params = {
             "size": limit,
             "query_text": query,
@@ -241,7 +254,9 @@ class OpenSearchAdapter:
     async def vector_search(self, query_vector: list[float], limit: int) -> list[dict[str, Any]]:
         """Run vector similarity search using loaded mustache template."""
 
-        search_path = OPEN_SEARCH_SEARCH_TEMPLATE_PATH_TEMPLATE.format(index=self._settings.opensearch_index)
+        search_path = OPEN_SEARCH_SEARCH_TEMPLATE_PATH_TEMPLATE.format(
+            index=self._settings.opensearch_index
+        )
         params = {
             "size": limit,
             "query_vector": query_vector,
@@ -282,7 +297,9 @@ class OpenSearchAdapter:
                 for item in hits
             ]
         except (httpx.HTTPError, ValueError) as error:
-            self._logger.error("opensearch_search_failed", error=str(error), search_type=search_type)
+            self._logger.error(
+                "opensearch_search_failed", error=str(error), search_type=search_type
+            )
             return []
 
     async def check_health(self) -> bool:

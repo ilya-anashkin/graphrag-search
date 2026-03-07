@@ -70,24 +70,32 @@ class FakeOpenSearchAdapter:
 class FakeNeo4jAdapter:
     """Fake Neo4j adapter."""
 
-    async def fetch_movie_graph_context(
+    async def fetch_graph_context(
         self,
-        movie_ids: list[str],
+        item_ids: list[str],
         person_limit: int = 5,
         related_limit: int = 3,
         shared_people_limit: int = 5,
     ) -> dict[str, dict[str, object]]:
-        """Return fake graph context for movie ids."""
+        """Return fake graph context for item ids."""
 
         return {
-            movie_id: {
+            item_id: {
                 "connections": [
-                    {"entity_type": "Director", "entity": "director-1", "relation": "DIRECTED"},
-                    {"entity_type": "Actor", "entity": "actor-1", "relation": "ACTED_IN"},
+                    {
+                        "entity_type": "Director",
+                        "entity": "director-1",
+                        "relation": "DIRECTED",
+                    },
+                    {
+                        "entity_type": "Actor",
+                        "entity": "actor-1",
+                        "relation": "ACTED_IN",
+                    },
                 ],
                 "related_movies": [
                     {
-                        "id": f"{movie_id}-related-1",
+                        "id": f"{item_id}-related-1",
                         "movie": "Related Movie",
                         "shared_people_count": related_limit,
                         "shared_people_relations": [
@@ -100,8 +108,14 @@ class FakeNeo4jAdapter:
                     }
                 ],
             }
-            for movie_id in movie_ids
+            for item_id in item_ids
         }
+
+    async def ingest_documents(self, rows: list[dict[str, object]]) -> tuple[list[str], list[str]]:
+        """Accept graph ingestion for provided rows."""
+
+        succeeded = [str(row.get("id", "")) for row in rows if str(row.get("id", ""))]
+        return succeeded, []
 
     async def check_health(self) -> bool:
         """Return fake healthy state."""
@@ -166,12 +180,23 @@ def build_domain_artifacts() -> DomainArtifacts:
             graph_rel_directed="DIRECTED",
             graph_rel_wrote="WROTE",
             graph_rel_produced_in="PRODUCED_IN",
+            graph_ingest_title_field="movie",
+            graph_ingest_overview_field="overview",
+            graph_ingest_year_field="year",
+            graph_ingest_rating_field="rating",
+            graph_ingest_rating_ball_field="rating_ball",
+            graph_ingest_url_logo_field="url_logo",
+            graph_ingest_country_field="country",
+            graph_ingest_director_field="director",
+            graph_ingest_screenwriter_field="screenwriter",
+            graph_ingest_actor_field="actors",
             llm_domain_schema={"entity": "MovieSearchResult"},
         ),
         templates=DomainTemplates(
             lexical_search="{}",
             vector_search="{}",
             graph_context_query="MATCH (n) RETURN n",
+            graph_ingest_query="UNWIND $rows AS row RETURN row.id AS id",
             llm_answer_prompt="{{question}}\n{{context}}",
         ),
     )
@@ -308,7 +333,9 @@ async def test_search_filters_lexical_only_when_vector_enabled() -> None:
                 }
             ]
 
-        async def vector_search(self, query_vector: list[float], limit: int) -> list[dict[str, object]]:
+        async def vector_search(
+            self, query_vector: list[float], limit: int
+        ) -> list[dict[str, object]]:
             return []
 
     settings = Settings(LEXICAL_SEARCH_WEIGHT=0.6, VECTOR_SEARCH_WEIGHT=0.4)

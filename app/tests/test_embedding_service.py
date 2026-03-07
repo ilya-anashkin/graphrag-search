@@ -7,7 +7,9 @@ from app.services.embedding_service import EmbeddingService, EmbeddingServiceErr
 
 
 @pytest.mark.asyncio
-async def test_ollama_embed_from_embed_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ollama_embed_from_embed_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Ollama provider should parse /api/embed response format."""
 
     settings = Settings(
@@ -36,7 +38,9 @@ async def test_ollama_embed_from_embed_endpoint(monkeypatch: pytest.MonkeyPatch)
 
 
 @pytest.mark.asyncio
-async def test_ollama_embed_from_legacy_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ollama_embed_from_legacy_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Ollama provider should parse legacy /api/embeddings response format."""
 
     settings = Settings(

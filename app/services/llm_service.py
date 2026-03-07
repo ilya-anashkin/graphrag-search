@@ -58,7 +58,11 @@ class LLMService:
             return
 
         if self._provider != LLM_PROVIDER_OLLAMA:
-            self._logger.info("llm_preload_skipped", reason="unsupported_provider", provider=self._provider)
+            self._logger.info(
+                "llm_preload_skipped",
+                reason="unsupported_provider",
+                provider=self._provider,
+            )
             return
 
         await self._call_ollama_generate(prompt="Скажи: ok")
@@ -197,7 +201,9 @@ class LLMService:
         }
         return json.dumps(schema_payload, ensure_ascii=False, indent=2)
 
-    def _render_prompt(self, question: str, context: str, data_schema: str, allowed_ids: list[str]) -> str:
+    def _render_prompt(
+        self, question: str, context: str, data_schema: str, allowed_ids: list[str]
+    ) -> str:
         """Render domain prompt template."""
 
         template = self._domain_artifacts.templates.llm_answer_prompt
@@ -266,7 +272,9 @@ class LLMService:
             "stream": False,
             "options": {"temperature": self._settings.llm_temperature},
         }
-        body = await self._request_with_retry(path=self._settings.llm_ollama_generate_endpoint, payload=payload)
+        body = await self._request_with_retry(
+            path=self._settings.llm_ollama_generate_endpoint, payload=payload
+        )
         answer = str(body.get(OLLAMA_RESPONSE_KEY, "")).strip()
         if not answer:
             raise LLMServiceError("LLM response is empty")

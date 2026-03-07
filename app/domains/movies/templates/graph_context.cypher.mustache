@@ -1,5 +1,5 @@
-UNWIND $movie_ids AS movie_id
-MATCH (m:{{movie_label}} {id: movie_id})
+UNWIND $item_ids AS item_id
+MATCH (m:{{movie_label}} {id: item_id})
 OPTIONAL MATCH (d:{{director_label}})-[:{{directed_rel}}]->(m)
 OPTIONAL MATCH (s:{{screenwriter_label}})-[:{{wrote_rel}}]->(m)
 OPTIONAL MATCH (a:{{actor_label}})-[:{{acted_in_rel}}]->(m)
@@ -33,7 +33,7 @@ CALL (m) {
   }) AS related_movies
 }
 RETURN
-  m.id AS movie_id,
+  m.id AS item_id,
   directors,
   screenwriters,
   actors[0..$person_limit] AS actors,

@@ -21,7 +21,9 @@ class SearchItem(BaseModel):
     id: str = Field(..., description="Result id.")
     score: float = Field(..., description="Normalized relevance score.")
     payload: dict[str, Any] = Field(default_factory=dict, description="Source-specific payload.")
-    debug: dict[str, Any] = Field(default_factory=dict, description="Per-channel scoring debug information.")
+    debug: dict[str, Any] = Field(
+        default_factory=dict, description="Per-channel scoring debug information."
+    )
 
 
 class SearchResponse(BaseModel):
@@ -35,7 +37,9 @@ class IndexDocumentRequest(BaseModel):
     """Incoming payload for document indexing."""
 
     id: str = Field(..., min_length=1, description="Document identifier.")
-    document: dict[str, Any] = Field(default_factory=dict, description="Domain-specific document payload.")
+    document: dict[str, Any] = Field(
+        default_factory=dict, description="Domain-specific document payload."
+    )
 
 
 class IndexDocumentResponse(BaseModel):
@@ -49,7 +53,9 @@ class IndexDocumentResponse(BaseModel):
 class IndexDocumentsBulkRequest(BaseModel):
     """Incoming bulk indexing payload."""
 
-    items: list[IndexDocumentRequest] = Field(default_factory=list, description="Documents for bulk indexing.")
+    items: list[IndexDocumentRequest] = Field(
+        default_factory=list, description="Documents for bulk indexing."
+    )
 
 
 class IndexDocumentsBulkResponse(BaseModel):
@@ -59,7 +65,9 @@ class IndexDocumentsBulkResponse(BaseModel):
     total: int = Field(..., description="Total number of received documents.")
     indexed: int = Field(..., description="Number of successfully indexed documents.")
     failed: int = Field(..., description="Number of failed documents.")
-    failed_ids: list[str] = Field(default_factory=list, description="Identifiers of failed documents.")
+    failed_ids: list[str] = Field(
+        default_factory=list, description="Identifiers of failed documents."
+    )
 
 
 class HealthResponse(BaseModel):
@@ -72,7 +80,9 @@ class AskRequest(BaseModel):
     """Incoming request for LLM answer generation."""
 
     question: str = Field(..., min_length=1, description="User question for LLM.")
-    items: list[SearchItem] = Field(default_factory=list, description="Search results context for answer.")
+    items: list[SearchItem] = Field(
+        default_factory=list, description="Search results context for answer."
+    )
 
 
 class AskResponse(BaseModel):
@@ -80,6 +90,8 @@ class AskResponse(BaseModel):
 
     request_id: str = Field(..., description="Correlation request id.")
     answer: str = Field(..., description="Generated answer.")
-    think: str | None = Field(default=None, description="Model internal reasoning text for debugging.")
+    think: str | None = Field(
+        default=None, description="Model internal reasoning text for debugging."
+    )
     model: str = Field(..., description="Model used for generation.")
     used_items: int = Field(..., description="Number of context items provided to the model.")

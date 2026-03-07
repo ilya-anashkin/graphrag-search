@@ -163,19 +163,21 @@ pytest
 
 ## Data Ingestion Script
 
-- JSONL ingestion script: `scripts/ingest_movies_jsonl.py`
-- Default input file: `app/domains/movies/example_data/kinopoisk-top250.jsonl`
+- JSONL ingestion script: `app/domains/movies/scripts/ingest_movies_jsonl.py`
+- Default input file: first `*.jsonl` from:
+  - `app/domains/$DOMAIN_NAME/example_data/`
+  - fallback: `app/domains/$DOMAIN_NAME/data/`
 
 Run:
 
 ```bash
-make ingest-movies-data
+make ingest-domain-data DOMAIN_NAME=movies
 ```
 
-Graph ingestion script:
+Optional explicit dataset path for both commands:
 
 ```bash
-make ingest-movies-graph
+make ingest-domain-data DOMAIN_NAME=movies DATASET_FILE=app/domains/movies/example_data/kinopoisk-top250.jsonl
 ```
 
 ## Domain Config And Templates

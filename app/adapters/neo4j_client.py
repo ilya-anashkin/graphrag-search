@@ -11,33 +11,6 @@ from app.core.domain_loader import DomainArtifacts
 from app.core.logging import get_logger
 
 GRAPH_CONTEXT_LIMIT = 5
-GRAPH_INGEST_QUERY = """
-UNWIND $rows AS row
-MERGE (m:Movie {id: row.id})
-SET
-  m.movie = row.movie,
-  m.overview = row.overview,
-  m.year = row.year,
-  m.rating = row.rating,
-  m.rating_ball = row.rating_ball,
-  m.url_logo = row.url_logo
-FOREACH (country_name IN row.countries |
-  MERGE (c:Country {name: country_name})
-  MERGE (c)-[:PRODUCED_IN]->(m)
-)
-FOREACH (person_name IN row.directors |
-  MERGE (p:Director {name: person_name})
-  MERGE (p)-[:DIRECTED]->(m)
-)
-FOREACH (person_name IN row.screenwriters |
-  MERGE (p:Screenwriter {name: person_name})
-  MERGE (p)-[:WROTE]->(m)
-)
-FOREACH (person_name IN row.actors |
-  MERGE (p:Actor {name: person_name})
-  MERGE (p)-[:ACTED_IN]->(m)
-)
-"""
 
 
 class Neo4jAdapter:
@@ -56,22 +29,25 @@ class Neo4jAdapter:
         self._graph_context_query = self._render_graph_template(
             template=self._domain_artifacts.templates.graph_context_query
         )
+        self._graph_ingest_query = self._render_graph_template(
+            template=self._domain_artifacts.templates.graph_ingest_query
+        )
 
     async def close(self) -> None:
         """Close Neo4j driver."""
 
         await self._driver.close()
 
-    async def fetch_movie_graph_context(
+    async def fetch_graph_context(
         self,
-        movie_ids: list[str],
+        item_ids: list[str],
         person_limit: int = GRAPH_CONTEXT_LIMIT,
         related_limit: int = 3,
         shared_people_limit: int = 5,
     ) -> dict[str, dict[str, Any]]:
-        """Fetch graph context for movies by identifiers."""
+        """Fetch graph context for indexed items by identifiers."""
 
-        if not movie_ids:
+        if not item_ids:
             return {}
 
         try:
@@ -82,27 +58,29 @@ class Neo4jAdapter:
             ):
                 with attempt:
                     return await self._run_graph_context_query(
-                        movie_ids=movie_ids,
+                        item_ids=item_ids,
                         person_limit=person_limit,
                         related_limit=related_limit,
                         shared_people_limit=shared_people_limit,
                     )
         except Exception as error:
-            self._logger.error("neo4j_context_query_failed", error=str(error), movie_ids=movie_ids[:20])
+            self._logger.error(
+                "neo4j_context_query_failed", error=str(error), item_ids=item_ids[:20]
+            )
             return {}
 
     async def _run_graph_context_query(
         self,
-        movie_ids: list[str],
+        item_ids: list[str],
         person_limit: int,
         related_limit: int,
         shared_people_limit: int,
     ) -> dict[str, dict[str, Any]]:
-        """Execute domain graph context query and return map by movie id."""
+        """Execute domain graph context query and return map by item id."""
 
         async with self._driver.session(database=self._settings.neo4j_database) as session:
             query_parameters = {
-                "movie_ids": movie_ids,
+                "item_ids": item_ids,
                 "person_limit": person_limit,
                 "related_limit": related_limit,
                 "shared_people_limit": shared_people_limit,
@@ -111,22 +89,22 @@ class Neo4jAdapter:
             rows = await cursor.data()
             self._logger.info(
                 "neo4j_context_query_completed",
-                requested_movie_ids=len(movie_ids),
+                requested_item_ids=len(item_ids),
                 returned_rows=len(rows),
                 person_limit=person_limit,
                 related_limit=related_limit,
                 shared_people_limit=shared_people_limit,
             )
-            context_by_movie_id: dict[str, dict[str, Any]] = {}
+            context_by_item_id: dict[str, dict[str, Any]] = {}
             for row in rows:
-                movie_id = str(row.get("movie_id", ""))
-                if not movie_id:
+                item_id = str(row.get("item_id", ""))
+                if not item_id:
                     continue
                 directors = self._normalize_name_list(row.get("directors", []))
                 screenwriters = self._normalize_name_list(row.get("screenwriters", []))
                 actors = self._normalize_name_list(row.get("actors", []))
                 countries = self._normalize_name_list(row.get("countries", []))
-                context_by_movie_id[movie_id] = {
+                context_by_item_id[item_id] = {
                     "connections": self._build_connections(
                         directors=directors,
                         screenwriters=screenwriters,
@@ -135,13 +113,13 @@ class Neo4jAdapter:
                     ),
                     "related_movies": self._normalize_related_movies(row.get("related_movies", [])),
                 }
-            return context_by_movie_id
+            return context_by_item_id
 
-    async def ingest_movies(self, rows: list[dict[str, Any]]) -> int:
-        """Insert movies into Neo4j as connected graph entities."""
+    async def ingest_documents(self, rows: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+        """Insert domain documents into Neo4j as connected graph entities."""
 
         if not rows:
-            return 0
+            return [], []
 
         try:
             async for attempt in AsyncRetrying(
@@ -153,32 +131,46 @@ class Neo4jAdapter:
                     return await self._run_ingest_query(rows=rows)
         except Exception as error:
             self._logger.error("neo4j_ingest_failed", error=str(error))
-            return 0
+            failed_ids = [
+                str(row.get("id", "")).strip() for row in rows if str(row.get("id", "")).strip()
+            ]
+            return [], failed_ids
 
-    async def _run_ingest_query(self, rows: list[dict[str, Any]]) -> int:
+    async def _run_ingest_query(self, rows: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
         """Execute ingestion query with UNWIND batching payload."""
 
         normalized_rows = [self._normalize_ingest_row(row=row) for row in rows]
         async with self._driver.session(database=self._settings.neo4j_database) as session:
-            cursor = await session.run(GRAPH_INGEST_QUERY, parameters={"rows": normalized_rows})
+            cursor = await session.run(
+                self._graph_ingest_query, parameters={"rows": normalized_rows}
+            )
             await cursor.consume()
-        return len(normalized_rows)
+        succeeded_ids = [row["id"] for row in normalized_rows]
+        return succeeded_ids, []
 
     def _normalize_ingest_row(self, row: dict[str, Any]) -> dict[str, Any]:
-        """Normalize one movie row for graph ingest query."""
+        """Normalize one row for graph ingest query based on domain config."""
+
+        config = self._domain_artifacts.search_config
 
         return {
             "id": str(row.get("id", "")),
-            "movie": str(row.get("movie", "")),
-            "overview": str(row.get("overview", "")),
-            "year": self._to_int_or_none(row.get("year")),
-            "rating": self._to_int_or_none(row.get("rating")),
-            "rating_ball": self._to_float_or_none(row.get("rating_ball")),
-            "url_logo": str(row.get("url_logo", "")),
-            "countries": self._normalize_names(raw_value=row.get("country")),
-            "directors": self._normalize_names(raw_value=row.get("director")),
-            "screenwriters": self._normalize_names(raw_value=row.get("screenwriter")),
-            "actors": self._normalize_names(raw_value=row.get("actors")),
+            "title": str(row.get(config.graph_ingest_title_field, "")),
+            "overview": str(row.get(config.graph_ingest_overview_field, "")),
+            "year": self._to_int_or_none(row.get(config.graph_ingest_year_field)),
+            "rating": self._to_int_or_none(row.get(config.graph_ingest_rating_field)),
+            "rating_ball": self._to_float_or_none(row.get(config.graph_ingest_rating_ball_field)),
+            "url_logo": str(row.get(config.graph_ingest_url_logo_field, "")),
+            "countries": self._normalize_names(
+                raw_value=row.get(config.graph_ingest_country_field)
+            ),
+            "directors": self._normalize_names(
+                raw_value=row.get(config.graph_ingest_director_field)
+            ),
+            "screenwriters": self._normalize_names(
+                raw_value=row.get(config.graph_ingest_screenwriter_field)
+            ),
+            "actors": self._normalize_names(raw_value=row.get(config.graph_ingest_actor_field)),
         }
 
     def _normalize_name_list(self, values: Any) -> list[str]:
@@ -206,7 +198,8 @@ class Neo4jAdapter:
                 {
                     "id": movie_id,
                     "movie": movie_title,
-                    "shared_people_count": self._to_int_or_none(item.get("shared_people_count")) or 0,
+                    "shared_people_count": self._to_int_or_none(item.get("shared_people_count"))
+                    or 0,
                     "shared_people_relations": self._normalize_shared_people_relations(
                         item.get("shared_people_relations", [])
                     ),

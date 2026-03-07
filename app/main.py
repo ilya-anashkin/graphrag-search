@@ -1,7 +1,7 @@
 """FastAPI entrypoint."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +14,8 @@ from app.core.config import Settings, get_settings
 from app.core.domain_loader import DomainLoader
 from app.core.logging import configure_logging, get_logger
 from app.core.request_id import request_id_middleware
-from app.frontend.routes import STATIC_DIR, router as frontend_router
+from app.frontend.routes import STATIC_DIR
+from app.frontend.routes import router as frontend_router
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import LLMService
 from app.services.search_service import SearchService
@@ -29,7 +30,9 @@ class AppContainer:
         self.settings = settings
         self._logger = get_logger(__name__)
 
-        domain_loader = DomainLoader(domain_root=settings.domains_root, domain_name=settings.domain_name)
+        domain_loader = DomainLoader(
+            domain_root=settings.domains_root, domain_name=settings.domain_name
+        )
         self.domain_artifacts = domain_loader.load()
 
         self._logger.info(
@@ -43,7 +46,9 @@ class AppContainer:
             llm_answer_prompt_length=len(self.domain_artifacts.templates.llm_answer_prompt),
         )
 
-        self.opensearch_adapter = OpenSearchAdapter(settings=settings, domain_artifacts=self.domain_artifacts)
+        self.opensearch_adapter = OpenSearchAdapter(
+            settings=settings, domain_artifacts=self.domain_artifacts
+        )
         self.neo4j_adapter = Neo4jAdapter(settings=settings, domain_artifacts=self.domain_artifacts)
         self.embedding_service = EmbeddingService(settings=settings)
         self.llm_service = LLMService(settings=settings, domain_artifacts=self.domain_artifacts)
@@ -81,9 +86,7 @@ def _add_middlewares(app: FastAPI, settings: Settings) -> None:
     """Register middleware stack."""
 
     @app.middleware("http")
-    async def request_id_http_middleware(
-        request: Request, call_next: RequestResponseEndpoint
-    ):
+    async def request_id_http_middleware(request: Request, call_next: RequestResponseEndpoint):
         """Bind request id for each incoming request."""
 
         return await request_id_middleware(request=request, call_next=call_next, settings=settings)

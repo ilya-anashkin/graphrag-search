@@ -8,14 +8,14 @@ from app.models.schemas import (
     AskResponse,
     HealthResponse,
     IndexDocumentRequest,
+    IndexDocumentResponse,
     IndexDocumentsBulkRequest,
     IndexDocumentsBulkResponse,
-    IndexDocumentResponse,
     SearchRequest,
     SearchResponse,
 )
-from app.services.search_service import SearchService
 from app.services.llm_service import LLMServiceError
+from app.services.search_service import SearchService
 
 router = APIRouter()
 
@@ -34,7 +34,9 @@ async def live() -> HealthResponse:
 
 
 @router.get("/health/ready", response_model=HealthResponse)
-async def ready(search_service: SearchService = Depends(get_search_service)) -> HealthResponse:
+async def ready(
+    search_service: SearchService = Depends(get_search_service),
+) -> HealthResponse:
     """Readiness probe endpoint with dependencies check."""
 
     is_ready = await search_service.check_dependencies()
@@ -42,7 +44,9 @@ async def ready(search_service: SearchService = Depends(get_search_service)) -> 
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search(payload: SearchRequest, search_service: SearchService = Depends(get_search_service)) -> SearchResponse:
+async def search(
+    payload: SearchRequest, search_service: SearchService = Depends(get_search_service)
+) -> SearchResponse:
     """Search endpoint."""
 
     items = await search_service.search(
@@ -56,7 +60,8 @@ async def search(payload: SearchRequest, search_service: SearchService = Depends
 
 @router.post("/documents", response_model=IndexDocumentResponse, status_code=201)
 async def index_document(
-    payload: IndexDocumentRequest, search_service: SearchService = Depends(get_search_service)
+    payload: IndexDocumentRequest,
+    search_service: SearchService = Depends(get_search_service),
 ) -> IndexDocumentResponse:
     """Document indexing endpoint."""
 
@@ -67,12 +72,15 @@ async def index_document(
             detail="Document indexing failed.",
         )
 
-    return IndexDocumentResponse(request_id=request_id_context.get(), id=payload.id, status="indexed")
+    return IndexDocumentResponse(
+        request_id=request_id_context.get(), id=payload.id, status="indexed"
+    )
 
 
 @router.post("/documents/bulk", response_model=IndexDocumentsBulkResponse)
 async def index_documents_bulk(
-    payload: IndexDocumentsBulkRequest, search_service: SearchService = Depends(get_search_service)
+    payload: IndexDocumentsBulkRequest,
+    search_service: SearchService = Depends(get_search_service),
 ) -> IndexDocumentsBulkResponse:
     """Bulk document indexing endpoint."""
 
@@ -90,11 +98,16 @@ async def index_documents_bulk(
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask(payload: AskRequest, search_service: SearchService = Depends(get_search_service)) -> AskResponse:
+async def ask(
+    payload: AskRequest, search_service: SearchService = Depends(get_search_service)
+) -> AskResponse:
     """LLM answer endpoint based on search results context."""
 
     if not payload.items:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="items must not be empty")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="items must not be empty",
+        )
 
     try:
         llm_result = await search_service.answer_from_search_items(

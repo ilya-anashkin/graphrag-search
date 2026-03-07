@@ -1,0 +1,25 @@
+UNWIND $rows AS row
+MERGE (m:{{movie_label}} {id: row.id})
+SET
+  m.movie = row.title,
+  m.overview = row.overview,
+  m.year = row.year,
+  m.rating = row.rating,
+  m.rating_ball = row.rating_ball,
+  m.url_logo = row.url_logo
+FOREACH (country_name IN row.countries |
+  MERGE (c:{{country_label}} {name: country_name})
+  MERGE (c)-[:{{produced_in_rel}}]->(m)
+)
+FOREACH (person_name IN row.directors |
+  MERGE (p:{{director_label}} {name: person_name})
+  MERGE (p)-[:{{directed_rel}}]->(m)
+)
+FOREACH (person_name IN row.screenwriters |
+  MERGE (p:{{screenwriter_label}} {name: person_name})
+  MERGE (p)-[:{{wrote_rel}}]->(m)
+)
+FOREACH (person_name IN row.actors |
+  MERGE (p:{{actor_label}} {name: person_name})
+  MERGE (p)-[:{{acted_in_rel}}]->(m)
+)

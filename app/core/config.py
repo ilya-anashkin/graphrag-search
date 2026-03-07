@@ -57,7 +57,9 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
     llm_model: str = Field(default="deepseek-r1:14b", alias="LLM_MODEL")
     llm_base_url: str = Field(default="http://localhost:11434", alias="LLM_BASE_URL")
-    llm_ollama_generate_endpoint: str = Field(default="/api/generate", alias="LLM_OLLAMA_GENERATE_ENDPOINT")
+    llm_ollama_generate_endpoint: str = Field(
+        default="/api/generate", alias="LLM_OLLAMA_GENERATE_ENDPOINT"
+    )
     llm_timeout_seconds: float = Field(default=120.0, alias="LLM_TIMEOUT_SECONDS")
     llm_temperature: float = Field(default=0.2, alias="LLM_TEMPERATURE")
     llm_preload_on_startup: bool = Field(default=False, alias="LLM_PRELOAD_ON_STARTUP")
@@ -69,7 +71,9 @@ class Settings(BaseSettings):
     graph_enrichment_enabled: bool = Field(default=True, alias="GRAPH_ENRICHMENT_ENABLED")
     graph_context_person_limit: int = Field(default=5, alias="GRAPH_CONTEXT_PERSON_LIMIT")
     graph_related_movies_limit: int = Field(default=3, alias="GRAPH_RELATED_MOVIES_LIMIT")
-    graph_related_shared_people_limit: int = Field(default=5, alias="GRAPH_RELATED_SHARED_PEOPLE_LIMIT")
+    graph_related_shared_people_limit: int = Field(
+        default=5, alias="GRAPH_RELATED_SHARED_PEOPLE_LIMIT"
+    )
     graph_ingest_batch_size: int = Field(default=100, alias="GRAPH_INGEST_BATCH_SIZE")
     bulk_index_batch_size: int = Field(default=100, alias="BULK_INDEX_BATCH_SIZE")
 
