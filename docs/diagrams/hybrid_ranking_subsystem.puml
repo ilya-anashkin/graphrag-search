@@ -1,0 +1,63 @@
+@startuml
+title Подсистема гибридного ранжирования
+
+actor "Клиент системы" as Client
+participant "FastAPI\nPOST /v1/search" as API
+participant "SearchService\nsearch" as Service
+participant "EmbeddingService\nembed_text" as Emb
+participant "OpenSearchAdapter\nlexical_search / vector_search" as OS
+
+Client -> API: POST /v1/search {query, limit, lexical_weight?, vector_weight?}
+API -> Service: search(...)
+
+Service -> Service: resolve_weights(lexical_weight, vector_weight)
+note right of Service
+- если веса не переданы: берутся из Settings
+- если сумма <= 0: fallback на веса из Settings
+- иначе: нормализация, чтобы сумма = 1
+end note
+
+Service -> Emb: embed_text(query)
+alt embedding failed
+  Service --> API: []
+  API --> Client: SearchResponse(items=[])
+  return
+end
+
+Service -> Service: lexical_limit = max(limit, LEXICAL_CANDIDATE_SIZE)
+Service -> Service: vector_limit = max(limit, VECTOR_CANDIDATE_SIZE)
+
+Service -> OS: lexical_search(query, lexical_limit)
+OS --> Service: lexical_results[{id, score, payload}]
+Service -> OS: vector_search(query_vector, vector_limit)
+OS --> Service: vector_results[{id, score, payload}]
+
+Service -> Service: normalize_channel_scores(lexical_results)
+Service -> Service: normalize_channel_scores(vector_results)
+note right of Service
+min-max по каждому каналу:
+- если range=0 и raw>0 => normalized=1
+- если range=0 и raw=0 => normalized=0
+- иначе normalized=(raw-min)/(max-min)
+end note
+
+Service -> Service: merge_weighted_results(...)
+note right of Service
+для каждого id:
+combined = lexical.normalized*lexical_weight
+         + vector.normalized*vector_weight
++ debug: raw/normalized/weight/weighted по каналам
+end note
+
+Service -> Service: filter_lexical_only_without_vector_signal(...)
+note right of Service
+если vector_weight>0:
+документы с lexical_raw>0 и vector_raw=0 удаляются
+end note
+
+Service -> Service: sort by combined score desc
+Service -> Service: take top limit
+Service --> API: ranked_items
+API --> Client: SearchResponse(items)
+
+@enduml

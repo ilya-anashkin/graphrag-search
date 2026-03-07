@@ -1,0 +1,44 @@
+@startuml
+title Подсистема /v1/ask (LLM-ответ по результатам поиска)
+
+actor "Клиент системы" as Client
+participant "FastAPI\nPOST /v1/ask" as API
+participant "SearchService\nanswer_from_search_items" as Service
+participant "LLMService\nanswer_from_items" as LLM
+participant "Ollama API\n/api/generate" as Ollama
+
+Client -> API: POST /v1/ask {question, items[]}
+
+alt items пустой
+  API --> Client: 422 Unprocessable Entity
+  return
+end
+
+API -> Service: answer_from_search_items(question, items)
+Service -> LLM: answer_from_items(question, items)
+
+LLM -> LLM: sort items by score desc
+LLM -> LLM: build context JSON\n(core payload + compact graph)
+LLM -> LLM: build data schema JSON\n(domain_schema + observed fields)
+LLM -> LLM: render prompt from mustache template\n(question, context, data_schema, allowed_ids)
+
+LLM -> Ollama: POST /api/generate\n{model, prompt, stream=false, temperature}
+Ollama --> LLM: response text
+
+LLM -> LLM: postprocess:\nextract <think>\nstrip think from answer\ntry parse JSON answer\nfallback to plain text
+LLM --> Service: {answer, think}
+Service --> API: {answer, think}
+
+API -> Service: get_llm_model()
+Service --> API: model
+API -> Service: resolve_used_context_items(len(items))
+Service --> API: used_items
+
+API --> Client: 200 AskResponse\n{request_id, answer, think, model, used_items}
+
+alt LLMServiceError
+  Service --> API: error
+  API --> Client: 502 Bad Gateway
+end
+
+@enduml

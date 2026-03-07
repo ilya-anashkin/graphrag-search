@@ -1,0 +1,79 @@
+@startuml
+' Hybrid Search System with GraphRAG — High-level Architecture
+' Use with PlantUML (https://plantuml.com)
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 220
+skinparam maxMessageSize 200
+
+title Гибридная поисковая система с GraphRAG — общая архитектура
+
+actor "Клиент\n(Web/CLI/Service)" as client
+
+rectangle "API слой" as api {
+  [Search API] as search_api
+  [Indexing API] as indexing_api
+}
+
+rectangle "Подсистема выполнения запросов" as query_subsystem {
+  [Hybrid Orchestrator\n(конвейер поиска)] as orch
+  [Query Preprocessor\n(нормализация, токенизация, фильтры)] as qprep
+
+  [Lexical Retrieval\n(BM25)] as bm25
+  [Dense Retrieval\n(kNN/ANN)] as dense
+  [Graph Expansion\n(GraphRAG)] as graph
+  [Rank Fusion / Re-ranking\n(агрегация скорингов)] as fusion
+}
+
+rectangle "Подсистема индексации и подготовки данных" as ingest_subsystem {
+  [Document Ingestion\n(загрузка/парсинг)] as ingest
+  [Chunking\n(сегментация)] as chunk
+  [Text Preprocessor\n(очистка/токенизация)] as tproc
+  [Embedding Generation\n(encoder)] as embed
+  [Graph Builder\n(построение связей)] as gbuild
+  [Index Builder\n(построение индексов)] as ibuild
+}
+
+rectangle "Подсистема хранения и управления данными" as storage_subsystem {
+  database "Text Storage" as text_storage
+  database "Vector Storage" as vec_storage
+  database "Graph Storage" as graph_storage
+}
+
+' ===== Client interactions =====
+client --> search_api
+client --> indexing_api
+
+search_api --> orch
+orch --> qprep
+
+' ===== Query pipeline =====
+qprep --> bm25
+qprep --> dense
+bm25 --> text_storage
+dense --> vec_storage
+
+' Merge candidates and expand via graph
+orch --> graph
+graph --> graph_storage
+
+' Final scoring + ranking
+orch --> fusion
+
+' ===== Indexing pipeline =====
+indexing_api --> ingest
+ingest --> chunk
+chunk --> tproc
+tproc --> text_storage
+
+chunk --> embed
+embed --> vec_storage
+
+tproc --> ibuild
+ibuild --> text_storage
+
+chunk --> gbuild
+gbuild --> graph_storage
+
+@enduml
