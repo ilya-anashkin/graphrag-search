@@ -24,9 +24,13 @@ DEFAULT_BATCH_SIZE = 25
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
 
-    parser = argparse.ArgumentParser(description="Ingest domain JSONL into API in bulk mode")
+    parser = argparse.ArgumentParser(
+        description="Ingest domain JSONL into API in bulk mode"
+    )
     parser.add_argument("--file", default=None, help="Path to JSONL input file")
-    parser.add_argument("--api-base-url", default=DEFAULT_API_BASE_URL, help="API base URL")
+    parser.add_argument(
+        "--api-base-url", default=DEFAULT_API_BASE_URL, help="API base URL"
+    )
     parser.add_argument(
         "--bulk-endpoint",
         default=DEFAULT_BULK_ENDPOINT,
@@ -72,7 +76,9 @@ def resolve_default_dataset_path() -> Path:
     )
 
 
-def build_document_payload(raw_item: dict[str, Any], domain_name: str) -> dict[str, Any]:
+def build_document_payload(
+    raw_item: dict[str, Any], domain_name: str
+) -> dict[str, Any]:
     """Map source JSONL record to API bulk document payload."""
 
     source_id = str(raw_item.get("id", "")).strip()
@@ -105,17 +111,25 @@ def load_payloads(path: Path, domain_name: str) -> list[dict[str, Any]]:
 
             try:
                 item = json.loads(stripped)
-                payloads.append(build_document_payload(raw_item=item, domain_name=domain_name))
+                payloads.append(
+                    build_document_payload(raw_item=item, domain_name=domain_name)
+                )
             except (json.JSONDecodeError, ValueError) as error:
-                raise ValueError(f"Invalid JSONL line {line_number}: {error}") from error
+                raise ValueError(
+                    f"Invalid JSONL line {line_number}: {error}"
+                ) from error
 
     return payloads
 
 
-def chunk_items(items: list[dict[str, Any]], batch_size: int) -> list[list[dict[str, Any]]]:
+def chunk_items(
+    items: list[dict[str, Any]], batch_size: int
+) -> list[list[dict[str, Any]]]:
     """Split payload list into batches."""
 
-    return [items[index : index + batch_size] for index in range(0, len(items), batch_size)]
+    return [
+        items[index : index + batch_size] for index in range(0, len(items), batch_size)
+    ]
 
 
 async def send_bulk_batches(
@@ -131,7 +145,9 @@ async def send_bulk_batches(
     failed_ids: list[str] = []
     batches = chunk_items(items=payloads, batch_size=batch_size)
     progress_bar = (
-        tqdm(total=len(batches), desc="OpenSearch bulk ingest", unit="batch") if tqdm else None
+        tqdm(total=len(batches), desc="OpenSearch bulk ingest", unit="batch")
+        if tqdm
+        else None
     )
 
     for batch in batches:
@@ -164,7 +180,9 @@ async def main() -> None:
         print("No records found in input file")
         return
 
-    async with httpx.AsyncClient(base_url=args.api_base_url, timeout=args.timeout) as client:
+    async with httpx.AsyncClient(
+        base_url=args.api_base_url, timeout=args.timeout
+    ) as client:
         indexed, failed, failed_ids = await send_bulk_batches(
             client=client,
             endpoint=args.bulk_endpoint,

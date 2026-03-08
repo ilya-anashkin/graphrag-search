@@ -42,16 +42,24 @@ class AppContainer:
             vector_source_fields=self.domain_artifacts.search_config.vector_source_fields,
             lexical_template_length=len(self.domain_artifacts.templates.lexical_search),
             vector_template_length=len(self.domain_artifacts.templates.vector_search),
-            graph_context_template_length=len(self.domain_artifacts.templates.graph_context_query),
-            llm_answer_prompt_length=len(self.domain_artifacts.templates.llm_answer_prompt),
+            graph_context_template_length=len(
+                self.domain_artifacts.templates.graph_context_query
+            ),
+            llm_answer_prompt_length=len(
+                self.domain_artifacts.templates.llm_answer_prompt
+            ),
         )
 
         self.opensearch_adapter = OpenSearchAdapter(
             settings=settings, domain_artifacts=self.domain_artifacts
         )
-        self.neo4j_adapter = Neo4jAdapter(settings=settings, domain_artifacts=self.domain_artifacts)
+        self.neo4j_adapter = Neo4jAdapter(
+            settings=settings, domain_artifacts=self.domain_artifacts
+        )
         self.embedding_service = EmbeddingService(settings=settings)
-        self.llm_service = LLMService(settings=settings, domain_artifacts=self.domain_artifacts)
+        self.llm_service = LLMService(
+            settings=settings, domain_artifacts=self.domain_artifacts
+        )
         self.search_service = SearchService(
             opensearch_adapter=self.opensearch_adapter,
             neo4j_adapter=self.neo4j_adapter,
@@ -86,10 +94,14 @@ def _add_middlewares(app: FastAPI, settings: Settings) -> None:
     """Register middleware stack."""
 
     @app.middleware("http")
-    async def request_id_http_middleware(request: Request, call_next: RequestResponseEndpoint):
+    async def request_id_http_middleware(
+        request: Request, call_next: RequestResponseEndpoint
+    ):
         """Bind request id for each incoming request."""
 
-        return await request_id_middleware(request=request, call_next=call_next, settings=settings)
+        return await request_id_middleware(
+            request=request, call_next=call_next, settings=settings
+        )
 
 
 @asynccontextmanager

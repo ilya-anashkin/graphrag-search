@@ -9,9 +9,15 @@ class SearchRequest(BaseModel):
     """Incoming search payload."""
 
     query: str = Field(..., min_length=1, description="User query string.")
-    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results.")
-    lexical_weight: float | None = Field(default=None, ge=0.0, description="Lexical score weight.")
-    vector_weight: float | None = Field(default=None, ge=0.0, description="Vector score weight.")
+    limit: int = Field(
+        default=10, ge=1, le=100, description="Maximum number of results."
+    )
+    lexical_weight: float | None = Field(
+        default=None, ge=0.0, description="Lexical score weight."
+    )
+    vector_weight: float | None = Field(
+        default=None, ge=0.0, description="Vector score weight."
+    )
 
 
 class SearchItem(BaseModel):
@@ -20,7 +26,9 @@ class SearchItem(BaseModel):
     source: str = Field(..., description="Result source system.")
     id: str = Field(..., description="Result id.")
     score: float = Field(..., description="Normalized relevance score.")
-    payload: dict[str, Any] = Field(default_factory=dict, description="Source-specific payload.")
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Source-specific payload."
+    )
     debug: dict[str, Any] = Field(
         default_factory=dict, description="Per-channel scoring debug information."
     )
@@ -94,4 +102,6 @@ class AskResponse(BaseModel):
         default=None, description="Model internal reasoning text for debugging."
     )
     model: str = Field(..., description="Model used for generation.")
-    used_items: int = Field(..., description="Number of context items provided to the model.")
+    used_items: int = Field(
+        ..., description="Number of context items provided to the model."
+    )

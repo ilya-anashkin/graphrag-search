@@ -16,7 +16,9 @@ from app.models.schemas import SearchItem
 
 LLM_PROVIDER_OLLAMA = "ollama"
 OLLAMA_RESPONSE_KEY = "response"
-THINK_BLOCK_PATTERN = re.compile(r"<think>(.*?)</think>\s*", flags=re.DOTALL | re.IGNORECASE)
+THINK_BLOCK_PATTERN = re.compile(
+    r"<think>(.*?)</think>\s*", flags=re.DOTALL | re.IGNORECASE
+)
 JSON_BLOCK_PATTERN = re.compile(r"\{.*\}", flags=re.DOTALL)
 CONTEXT_CORE_FIELDS = (
     "movie",
@@ -109,7 +111,9 @@ class LLMService:
         context_items: list[dict[str, Any]] = []
         for item in items[:limit]:
             payload = item.payload if isinstance(item.payload, dict) else {}
-            core_payload = {key: payload.get(key) for key in CONTEXT_CORE_FIELDS if key in payload}
+            core_payload = {
+                key: payload.get(key) for key in CONTEXT_CORE_FIELDS if key in payload
+            }
             graph_payload = payload.get("graph", {})
             context_items.append(
                 {
@@ -280,7 +284,9 @@ class LLMService:
             raise LLMServiceError("LLM response is empty")
         return answer
 
-    async def _request_with_retry(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _request_with_retry(
+        self, path: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute LLM request with retry policy."""
 
         async for attempt in AsyncRetrying(
@@ -312,6 +318,8 @@ class LLMService:
                         f"LLM transport error on {path}: {type(error).__name__}: {error!r}"
                     ) from error
                 except ValueError as error:
-                    raise LLMServiceError(f"LLM returned invalid JSON: {error}") from error
+                    raise LLMServiceError(
+                        f"LLM returned invalid JSON: {error}"
+                    ) from error
 
         raise LLMServiceError("LLM request failed after retries")

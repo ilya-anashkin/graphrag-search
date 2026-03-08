@@ -9,7 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     app_name: str = Field(default="graphrag-search-api", alias="APP_NAME")
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
@@ -22,17 +24,29 @@ class Settings(BaseSettings):
     domains_root: str = Field(default="app/domains", alias="DOMAINS_ROOT")
 
     api_timeout_seconds: float = Field(default=5.0, alias="API_TIMEOUT_SECONDS")
-    opensearch_timeout_seconds: float = Field(default=60.0, alias="OPENSEARCH_TIMEOUT_SECONDS")
-    embedding_timeout_seconds: float = Field(default=120.0, alias="EMBEDDING_TIMEOUT_SECONDS")
+    opensearch_timeout_seconds: float = Field(
+        default=60.0, alias="OPENSEARCH_TIMEOUT_SECONDS"
+    )
+    embedding_timeout_seconds: float = Field(
+        default=120.0, alias="EMBEDDING_TIMEOUT_SECONDS"
+    )
     retry_attempts: int = Field(default=3, alias="RETRY_ATTEMPTS")
     retry_wait_seconds: float = Field(default=0.5, alias="RETRY_WAIT_SECONDS")
 
-    opensearch_base_url: str = Field(default="http://localhost:9200", alias="OPENSEARCH_BASE_URL")
+    opensearch_base_url: str = Field(
+        default="http://localhost:9200", alias="OPENSEARCH_BASE_URL"
+    )
     opensearch_index: str = Field(default="documents", alias="OPENSEARCH_INDEX")
     opensearch_title_field: str = Field(default="title", alias="OPENSEARCH_TITLE_FIELD")
-    opensearch_content_field: str = Field(default="content", alias="OPENSEARCH_CONTENT_FIELD")
-    opensearch_metadata_field: str = Field(default="metadata", alias="OPENSEARCH_METADATA_FIELD")
-    opensearch_vector_field: str = Field(default="embedding", alias="OPENSEARCH_VECTOR_FIELD")
+    opensearch_content_field: str = Field(
+        default="content", alias="OPENSEARCH_CONTENT_FIELD"
+    )
+    opensearch_metadata_field: str = Field(
+        default="metadata", alias="OPENSEARCH_METADATA_FIELD"
+    )
+    opensearch_vector_field: str = Field(
+        default="embedding", alias="OPENSEARCH_VECTOR_FIELD"
+    )
 
     neo4j_uri: str = Field(default="bolt://localhost:7687", alias="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", alias="NEO4J_USER")
@@ -47,9 +61,15 @@ class Settings(BaseSettings):
     embedding_dimension: int = Field(default=384, alias="EMBEDDING_DIMENSION")
     embedding_device: str = Field(default="cpu", alias="EMBEDDING_DEVICE")
     embedding_normalize: bool = Field(default=True, alias="EMBEDDING_NORMALIZE")
-    embedding_preload_on_startup: bool = Field(default=True, alias="EMBEDDING_PRELOAD_ON_STARTUP")
-    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
-    ollama_embedding_endpoint: str = Field(default="/api/embed", alias="OLLAMA_EMBEDDING_ENDPOINT")
+    embedding_preload_on_startup: bool = Field(
+        default=True, alias="EMBEDDING_PRELOAD_ON_STARTUP"
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434", alias="OLLAMA_BASE_URL"
+    )
+    ollama_embedding_endpoint: str = Field(
+        default="/api/embed", alias="OLLAMA_EMBEDDING_ENDPOINT"
+    )
     ollama_embedding_legacy_endpoint: str = Field(
         default="/api/embeddings",
         alias="OLLAMA_EMBEDDING_LEGACY_ENDPOINT",
@@ -68,8 +88,12 @@ class Settings(BaseSettings):
     vector_search_weight: float = Field(default=0.4, alias="VECTOR_SEARCH_WEIGHT")
     lexical_candidate_size: int = Field(default=40, alias="LEXICAL_CANDIDATE_SIZE")
     vector_candidate_size: int = Field(default=60, alias="VECTOR_CANDIDATE_SIZE")
-    graph_context_person_limit: int = Field(default=5, alias="GRAPH_CONTEXT_PERSON_LIMIT")
-    graph_related_movies_limit: int = Field(default=3, alias="GRAPH_RELATED_MOVIES_LIMIT")
+    graph_context_person_limit: int = Field(
+        default=5, alias="GRAPH_CONTEXT_PERSON_LIMIT"
+    )
+    graph_related_movies_limit: int = Field(
+        default=3, alias="GRAPH_RELATED_MOVIES_LIMIT"
+    )
     graph_related_shared_people_limit: int = Field(
         default=5, alias="GRAPH_RELATED_SHARED_PEOPLE_LIMIT"
     )

@@ -16,6 +16,11 @@ CHANNEL_LEXICAL = "lexical"
 CHANNEL_VECTOR = "vector"
 NORMALIZED_SCORE_KEY = "normalized_score"
 DEFAULT_SCORE = 0.0
+DEGRADED_MODE_KEY = "degraded_mode"
+DEGRADED_MODE_NONE = "none"
+DEGRADED_MODE_LEXICAL_ONLY_NO_EMBEDDING = "lexical_only_no_embedding"
+DEGRADED_MODE_LEXICAL_ONLY_NO_VECTOR = "lexical_only_no_vector"
+DEGRADED_MODE_NO_GRAPH_CONTEXT = "no_graph_context"
 
 
 class SearchService:
@@ -73,7 +78,9 @@ class SearchService:
         try:
             embedding = await self._embedding_service.embed_text(embedding_text)
         except (EmbeddingServiceError, ValueError) as error:
-            self._logger.error("embedding_build_failed", error=str(error), document_id=payload.id)
+            self._logger.error(
+                "embedding_build_failed", error=str(error), document_id=payload.id
+            )
             return False
 
         opensearch_indexed = await self._opensearch_adapter.index_document(
@@ -84,8 +91,10 @@ class SearchService:
         if not opensearch_indexed:
             return False
 
-        graph_succeeded_ids, graph_failed_ids = await self._neo4j_adapter.ingest_documents(
-            rows=[{"id": payload.id, **payload.document}]
+        graph_succeeded_ids, graph_failed_ids = (
+            await self._neo4j_adapter.ingest_documents(
+                rows=[{"id": payload.id, **payload.document}]
+            )
         )
         if graph_failed_ids or payload.id not in graph_succeeded_ids:
             self._logger.error(
@@ -109,11 +118,17 @@ class SearchService:
         indexed_count = 0
         failed_ids: list[str] = []
 
-        for chunk in self._chunk_payloads(payloads=payloads, batch_size=resolved_batch_size):
-            chunk_texts = [self._build_embedding_text(document=item.document) for item in chunk]
+        for chunk in self._chunk_payloads(
+            payloads=payloads, batch_size=resolved_batch_size
+        ):
+            chunk_texts = [
+                self._build_embedding_text(document=item.document) for item in chunk
+            ]
             prepared_items: list[tuple[str, dict[str, Any], list[float]]] = []
             try:
-                chunk_embeddings = await self._embedding_service.embed_texts(chunk_texts)
+                chunk_embeddings = await self._embedding_service.embed_texts(
+                    chunk_texts
+                )
                 if len(chunk_embeddings) != len(chunk):
                     raise EmbeddingServiceError(
                         "Embedding batch size mismatch. "
@@ -130,7 +145,9 @@ class SearchService:
                 for item in chunk:
                     embedding_text = self._build_embedding_text(document=item.document)
                     try:
-                        embedding = await self._embedding_service.embed_text(embedding_text)
+                        embedding = await self._embedding_service.embed_text(
+                            embedding_text
+                        )
                     except (EmbeddingServiceError, ValueError) as single_error:
                         self._logger.error(
                             "embedding_build_failed",
@@ -144,8 +161,8 @@ class SearchService:
             if not prepared_items:
                 continue
 
-            succeeded_ids, chunk_failed_ids = await self._opensearch_adapter.bulk_index_documents(
-                prepared_items
+            succeeded_ids, chunk_failed_ids = (
+                await self._opensearch_adapter.bulk_index_documents(prepared_items)
             )
             failed_ids.extend(chunk_failed_ids)
             if not succeeded_ids:
@@ -157,12 +174,14 @@ class SearchService:
                 for doc_id, document, _ in prepared_items
                 if doc_id in succeeded_ids_set
             }
-            graph_succeeded_ids, graph_failed_ids = await self._neo4j_adapter.ingest_documents(
-                rows=[
-                    {"id": doc_id, **succeeded_docs[doc_id]}
-                    for doc_id in succeeded_ids
-                    if doc_id in succeeded_docs
-                ]
+            graph_succeeded_ids, graph_failed_ids = (
+                await self._neo4j_adapter.ingest_documents(
+                    rows=[
+                        {"id": doc_id, **succeeded_docs[doc_id]}
+                        for doc_id in succeeded_ids
+                        if doc_id in succeeded_docs
+                    ]
+                )
             )
             for failed_id in graph_failed_ids:
                 if failed_id not in failed_ids:
@@ -186,7 +205,8 @@ class SearchService:
         """Split payloads into fixed-size chunks."""
 
         return [
-            payloads[index : index + batch_size] for index in range(0, len(payloads), batch_size)
+            payloads[index : index + batch_size]
+            for index in range(0, len(payloads), batch_size)
         ]
 
     def _build_embedding_text(self, document: dict[str, Any]) -> str:
@@ -194,7 +214,9 @@ class SearchService:
 
         fields = self._domain_artifacts.search_config.vector_source_fields
         if not fields:
-            return "\n".join(str(value) for value in document.values() if value is not None)
+            return "\n".join(
+                str(value) for value in document.values() if value is not None
+            )
 
         parts = [
             str(document.get(field, ""))
@@ -216,22 +238,42 @@ class SearchService:
             lexical_weight=lexical_weight,
             vector_weight=vector_weight,
         )
-        try:
-            query_embedding = await self._embedding_service.embed_text(query)
-        except (EmbeddingServiceError, ValueError) as error:
-            self._logger.error("embedding_build_failed", error=str(error))
-            return []
+        degraded_mode = DEGRADED_MODE_NONE
 
         lexical_limit = max(limit, self._settings.lexical_candidate_size)
-        vector_limit = max(limit, self._settings.vector_candidate_size)
-
         lexical_results = await self._opensearch_adapter.lexical_search(
             query=query, limit=lexical_limit
         )
-        vector_results = await self._opensearch_adapter.vector_search(
-            query_vector=query_embedding,
-            limit=vector_limit,
-        )
+        vector_results: list[dict[str, Any]] = []
+        vector_channel_available = False
+
+        if resolved_vector_weight > 0:
+            vector_limit = max(limit, self._settings.vector_candidate_size)
+            try:
+                query_embedding = await self._embedding_service.embed_text(query)
+            except (EmbeddingServiceError, ValueError) as error:
+                self._logger.warning(
+                    "embedding_build_failed_degrade_to_lexical", error=str(error)
+                )
+                degraded_mode = DEGRADED_MODE_LEXICAL_ONLY_NO_EMBEDDING
+            else:
+                vector_results = await self._opensearch_adapter.vector_search(
+                    query_vector=query_embedding,
+                    limit=vector_limit,
+                )
+                vector_channel_available = len(vector_results) > 0
+                if not vector_channel_available:
+                    self._logger.warning(
+                        "vector_channel_unavailable_degrade_to_lexical",
+                        reason="empty_or_failed_vector_results",
+                    )
+                    degraded_mode = DEGRADED_MODE_LEXICAL_ONLY_NO_VECTOR
+
+        effective_lexical_weight = resolved_lexical_weight
+        effective_vector_weight = resolved_vector_weight
+        if not vector_channel_available:
+            effective_lexical_weight = 1.0
+            effective_vector_weight = 0.0
 
         lexical_results = self._normalize_channel_scores(results=lexical_results)
         vector_results = self._normalize_channel_scores(results=vector_results)
@@ -239,16 +281,17 @@ class SearchService:
         weighted_items = self._merge_weighted_results(
             lexical_results=lexical_results,
             vector_results=vector_results,
-            lexical_weight=resolved_lexical_weight,
-            vector_weight=resolved_vector_weight,
+            lexical_weight=effective_lexical_weight,
+            vector_weight=effective_vector_weight,
         )
         filtered_items = self._filter_lexical_only_without_vector_signal(
             items=weighted_items.values(),
-            vector_weight=resolved_vector_weight,
+            vector_weight=effective_vector_weight,
         )
 
         sorted_items = sorted(filtered_items, key=lambda item: item.score, reverse=True)
         limited_items = sorted_items[:limit]
+        self._apply_degraded_mode(items=limited_items, degraded_mode=degraded_mode)
         return await self._enrich_with_graph_context(items=limited_items)
 
     def _filter_lexical_only_without_vector_signal(
@@ -272,7 +315,9 @@ class SearchService:
             filtered.append(item)
         return filtered
 
-    async def _enrich_with_graph_context(self, items: list[SearchItem]) -> list[SearchItem]:
+    async def _enrich_with_graph_context(
+        self, items: list[SearchItem]
+    ) -> list[SearchItem]:
         """Enrich search results with graph context from Neo4j."""
 
         if not items:
@@ -304,6 +349,10 @@ class SearchService:
             if context is not None:
                 item.payload["graph"] = context
                 enriched_count += 1
+            else:
+                self._set_degraded_mode(
+                    item=item, degraded_mode=DEGRADED_MODE_NO_GRAPH_CONTEXT
+                )
         self._logger.info(
             "graph_enrichment_finished",
             total_items=len(items),
@@ -318,10 +367,14 @@ class SearchService:
         """Resolve effective weights and normalize them to sum 1."""
 
         resolved_lexical_weight = (
-            self._settings.lexical_search_weight if lexical_weight is None else lexical_weight
+            self._settings.lexical_search_weight
+            if lexical_weight is None
+            else lexical_weight
         )
         resolved_vector_weight = (
-            self._settings.vector_search_weight if vector_weight is None else vector_weight
+            self._settings.vector_search_weight
+            if vector_weight is None
+            else vector_weight
         )
 
         total_weight = resolved_lexical_weight + resolved_vector_weight
@@ -335,7 +388,9 @@ class SearchService:
             resolved_vector_weight / total_weight,
         )
 
-    def _normalize_channel_scores(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _normalize_channel_scores(
+        self, results: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Normalize channel scores with min-max scaling to [0, 1]."""
 
         if not results:
@@ -390,7 +445,9 @@ class SearchService:
 
         return merged
 
-    def _build_debug_payload(self, lexical_weight: float, vector_weight: float) -> dict[str, Any]:
+    def _build_debug_payload(
+        self, lexical_weight: float, vector_weight: float
+    ) -> dict[str, Any]:
         """Build initial per-channel debug payload."""
 
         return {
@@ -407,7 +464,23 @@ class SearchService:
                 "weighted_score": 0.0,
             },
             "combined_score": 0.0,
+            DEGRADED_MODE_KEY: DEGRADED_MODE_NONE,
         }
+
+    def _apply_degraded_mode(
+        self, items: Iterable[SearchItem], degraded_mode: str
+    ) -> None:
+        """Apply search-level degraded mode to all output items."""
+
+        if degraded_mode == DEGRADED_MODE_NONE:
+            return
+        for item in items:
+            self._set_degraded_mode(item=item, degraded_mode=degraded_mode)
+
+    def _set_degraded_mode(self, item: SearchItem, degraded_mode: str) -> None:
+        """Set degraded mode into item debug payload."""
+
+        item.debug[DEGRADED_MODE_KEY] = degraded_mode
 
     def _accumulate_results(
         self,
@@ -444,7 +517,9 @@ class SearchService:
                 existing_item = merged[result_id]
 
             channel_debug = existing_item.debug.get(channel, {})
-            channel_debug["raw_score"] = float(channel_debug.get("raw_score", 0.0)) + raw_score
+            channel_debug["raw_score"] = (
+                float(channel_debug.get("raw_score", 0.0)) + raw_score
+            )
             channel_debug["normalized_score"] = (
                 float(channel_debug.get("normalized_score", 0.0)) + normalized_score
             )

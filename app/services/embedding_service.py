@@ -117,7 +117,9 @@ class EmbeddingService:
             if self._local_model is not None:
                 return self._local_model
 
-            self._local_model = await asyncio.to_thread(self._load_sentence_transformer_model)
+            self._local_model = await asyncio.to_thread(
+                self._load_sentence_transformer_model
+            )
             return self._local_model
 
     def _load_sentence_transformer_model(self) -> Any:
@@ -141,7 +143,9 @@ class EmbeddingService:
         vectors = self._embed_local_batch_sync(model=model, texts=[text])
         return vectors[0]
 
-    def _embed_local_batch_sync(self, model: Any, texts: list[str]) -> list[list[float]]:
+    def _embed_local_batch_sync(
+        self, model: Any, texts: list[str]
+    ) -> list[list[float]]:
         """Encode multiple texts with sentence-transformers model."""
 
         matrix = model.encode(
@@ -152,7 +156,10 @@ class EmbeddingService:
         rows = matrix.tolist()
         if not isinstance(rows, list):
             raise EmbeddingServiceError("Local model returned invalid embedding matrix")
-        return [self._finalize_vector(values=[float(value) for value in row]) for row in rows]
+        return [
+            self._finalize_vector(values=[float(value) for value in row])
+            for row in rows
+        ]
 
     async def _embed_ollama(self, text: str) -> list[float]:
         """Encode text with Ollama HTTP API."""
@@ -178,7 +185,9 @@ class EmbeddingService:
                 path=self._settings.ollama_embedding_endpoint,
                 payload=payload,
             )
-            vectors = self._extract_ollama_vectors(response=response, expected_count=len(texts))
+            vectors = self._extract_ollama_vectors(
+                response=response, expected_count=len(texts)
+            )
             return [self._finalize_vector(values=vector) for vector in vectors]
         except EmbeddingServiceError as error:
             self._logger.warning(
@@ -200,7 +209,9 @@ class EmbeddingService:
                         OLLAMA_PROMPT_KEY: text,
                     },
                 )
-                vector = self._extract_ollama_vectors(response=response, expected_count=1)[0]
+                vector = self._extract_ollama_vectors(
+                    response=response, expected_count=1
+                )[0]
                 vectors.append(self._finalize_vector(values=vector))
             return vectors
 
@@ -216,7 +227,9 @@ class EmbeddingService:
         client = self._get_ollama_client()
 
         try:
-            return await self._request_ollama_once(client=client, path=path, payload=payload)
+            return await self._request_ollama_once(
+                client=client, path=path, payload=payload
+            )
         except EmbeddingServiceError:
             if fallback_path is None or fallback_payload is None:
                 raise
@@ -243,16 +256,26 @@ class EmbeddingService:
                     response.raise_for_status()
                     body = response.json()
                     if not isinstance(body, dict):
-                        raise EmbeddingServiceError("Ollama response must be a JSON object")
+                        raise EmbeddingServiceError(
+                            "Ollama response must be a JSON object"
+                        )
                     return body
                 except httpx.HTTPStatusError as error:
                     if error.response.status_code == 404:
-                        raise EmbeddingServiceError(f"Ollama endpoint not found: {path}") from error
-                    raise EmbeddingServiceError(f"Ollama HTTP error: {error}") from error
+                        raise EmbeddingServiceError(
+                            f"Ollama endpoint not found: {path}"
+                        ) from error
+                    raise EmbeddingServiceError(
+                        f"Ollama HTTP error: {error}"
+                    ) from error
                 except httpx.HTTPError as error:
-                    raise EmbeddingServiceError(f"Ollama request failed: {error}") from error
+                    raise EmbeddingServiceError(
+                        f"Ollama request failed: {error}"
+                    ) from error
                 except ValueError as error:
-                    raise EmbeddingServiceError(f"Ollama returned invalid JSON: {error}") from error
+                    raise EmbeddingServiceError(
+                        f"Ollama returned invalid JSON: {error}"
+                    ) from error
 
         raise EmbeddingServiceError("Ollama request failed after retries")
 
@@ -264,14 +287,18 @@ class EmbeddingService:
         if OLLAMA_EMBED_RESPONSE_KEY in response:
             values = response.get(OLLAMA_EMBED_RESPONSE_KEY)
             if not isinstance(values, list) or not values:
-                raise EmbeddingServiceError("Ollama /api/embed returned empty embeddings list")
+                raise EmbeddingServiceError(
+                    "Ollama /api/embed returned empty embeddings list"
+                )
             if len(values) != expected_count:
                 raise EmbeddingServiceError(
                     "Ollama /api/embed embeddings count mismatch. "
                     f"Expected {expected_count}, got {len(values)}"
                 )
             if not all(isinstance(item, list) for item in values):
-                raise EmbeddingServiceError("Ollama /api/embed returned invalid embedding format")
+                raise EmbeddingServiceError(
+                    "Ollama /api/embed returned invalid embedding format"
+                )
             return [[float(value) for value in item] for item in values]
 
         if OLLAMA_EMBEDDING_RESPONSE_KEY in response:
@@ -331,6 +358,8 @@ class EmbeddingService:
 
         for index in range(self._settings.embedding_dimension):
             digest = hashlib.sha256(text_bytes + str(index).encode("utf-8")).digest()
-            values[index] = int.from_bytes(digest[:4], byteorder="big", signed=False) / MAX_UINT32
+            values[index] = (
+                int.from_bytes(digest[:4], byteorder="big", signed=False) / MAX_UINT32
+            )
 
         return self._finalize_vector(values=values)

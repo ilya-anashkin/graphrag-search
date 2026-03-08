@@ -9,7 +9,9 @@ import structlog
 REQUEST_ID_CONTEXT_KEY = "request_id"
 DEFAULT_REQUEST_ID = "unknown"
 
-request_id_context: ContextVar[str] = ContextVar(REQUEST_ID_CONTEXT_KEY, default=DEFAULT_REQUEST_ID)
+request_id_context: ContextVar[str] = ContextVar(
+    REQUEST_ID_CONTEXT_KEY, default=DEFAULT_REQUEST_ID
+)
 
 
 def _add_request_id(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:

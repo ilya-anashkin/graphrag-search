@@ -115,12 +115,16 @@ async def ask(
             items=payload.items,
         )
     except LLMServiceError as error:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)
+        ) from error
 
     return AskResponse(
         request_id=request_id_context.get(),
         answer=str(llm_result.get("answer", "")),
         think=llm_result.get("think"),
         model=search_service.get_llm_model(),
-        used_items=search_service.resolve_used_context_items(items_count=len(payload.items)),
+        used_items=search_service.resolve_used_context_items(
+            items_count=len(payload.items)
+        ),
     )
