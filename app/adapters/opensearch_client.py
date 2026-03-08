@@ -67,7 +67,9 @@ class OpenSearchAdapter:
             reraise=True,
         ):
             with attempt:
-                response = await self._client.request(method=method, url=path, json=json_data)
+                response = await self._client.request(
+                    method=method, url=path, json=json_data
+                )
                 if response.status_code not in allowed_statuses:
                     response.raise_for_status()
                 if not response.content:
@@ -97,7 +99,9 @@ class OpenSearchAdapter:
     async def ensure_index(self) -> bool:
         """Ensure target index exists with loaded domain mapping."""
 
-        index_path = OPEN_SEARCH_INDEX_PATH_TEMPLATE.format(index=self._settings.opensearch_index)
+        index_path = OPEN_SEARCH_INDEX_PATH_TEMPLATE.format(
+            index=self._settings.opensearch_index
+        )
         index_body = self._build_index_body()
 
         try:
@@ -204,7 +208,9 @@ class OpenSearchAdapter:
 
         ndjson_lines: list[str] = []
         for document_id, document, embedding in items:
-            action = {"index": {"_index": self._settings.opensearch_index, "_id": document_id}}
+            action = {
+                "index": {"_index": self._settings.opensearch_index, "_id": document_id}
+            }
             source = dict(document)
             source[self._settings.opensearch_vector_field] = embedding
             ndjson_lines.append(json.dumps(action, ensure_ascii=False))
@@ -251,7 +257,9 @@ class OpenSearchAdapter:
             search_type="lexical",
         )
 
-    async def vector_search(self, query_vector: list[float], limit: int) -> list[dict[str, Any]]:
+    async def vector_search(
+        self, query_vector: list[float], limit: int
+    ) -> list[dict[str, Any]]:
         """Run vector similarity search using loaded mustache template."""
 
         search_path = OPEN_SEARCH_SEARCH_TEMPLATE_PATH_TEMPLATE.format(

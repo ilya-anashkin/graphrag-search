@@ -70,9 +70,15 @@ class DomainLoader:
         config_path = domain_path / "index_config.json"
         lexical_template_path = domain_path / "templates" / "lexical_search.mustache"
         vector_template_path = domain_path / "templates" / "vector_search.mustache"
-        graph_context_query_path = domain_path / "templates" / "graph_context.cypher.mustache"
-        graph_ingest_query_path = domain_path / "templates" / "graph_ingest.cypher.mustache"
-        llm_answer_prompt_path = domain_path / "templates" / "llm_answer_prompt.mustache"
+        graph_context_query_path = (
+            domain_path / "templates" / "graph_context.cypher.mustache"
+        )
+        graph_ingest_query_path = (
+            domain_path / "templates" / "graph_ingest.cypher.mustache"
+        )
+        llm_answer_prompt_path = (
+            domain_path / "templates" / "llm_answer_prompt.mustache"
+        )
 
         config_payload = self._load_json(path=config_path)
         index_body = config_payload.get("index", {})
@@ -90,21 +96,33 @@ class DomainLoader:
                 ],
                 graph_node_label_movie=str(graph_payload.get("movie_label", "Movie")),
                 graph_node_label_actor=str(graph_payload.get("actor_label", "Actor")),
-                graph_node_label_director=str(graph_payload.get("director_label", "Director")),
+                graph_node_label_director=str(
+                    graph_payload.get("director_label", "Director")
+                ),
                 graph_node_label_screenwriter=str(
                     graph_payload.get("screenwriter_label", "Screenwriter")
                 ),
-                graph_node_label_country=str(graph_payload.get("country_label", "Country")),
+                graph_node_label_country=str(
+                    graph_payload.get("country_label", "Country")
+                ),
                 graph_rel_acted_in=str(graph_payload.get("acted_in_rel", "ACTED_IN")),
                 graph_rel_directed=str(graph_payload.get("directed_rel", "DIRECTED")),
                 graph_rel_wrote=str(graph_payload.get("wrote_rel", "WROTE")),
-                graph_rel_produced_in=str(graph_payload.get("produced_in_rel", "PRODUCED_IN")),
-                graph_ingest_title_field=str(graph_ingest_payload.get("title_field", "movie")),
+                graph_rel_produced_in=str(
+                    graph_payload.get("produced_in_rel", "PRODUCED_IN")
+                ),
+                graph_ingest_title_field=str(
+                    graph_ingest_payload.get("title_field", "movie")
+                ),
                 graph_ingest_overview_field=str(
                     graph_ingest_payload.get("overview_field", "overview")
                 ),
-                graph_ingest_year_field=str(graph_ingest_payload.get("year_field", "year")),
-                graph_ingest_rating_field=str(graph_ingest_payload.get("rating_field", "rating")),
+                graph_ingest_year_field=str(
+                    graph_ingest_payload.get("year_field", "year")
+                ),
+                graph_ingest_rating_field=str(
+                    graph_ingest_payload.get("rating_field", "rating")
+                ),
                 graph_ingest_rating_ball_field=str(
                     graph_ingest_payload.get("rating_ball_field", "rating_ball")
                 ),
@@ -120,7 +138,9 @@ class DomainLoader:
                 graph_ingest_screenwriter_field=str(
                     graph_ingest_payload.get("screenwriter_field", "screenwriter")
                 ),
-                graph_ingest_actor_field=str(graph_ingest_payload.get("actor_field", "actors")),
+                graph_ingest_actor_field=str(
+                    graph_ingest_payload.get("actor_field", "actors")
+                ),
                 llm_domain_schema=dict(llm_payload.get("domain_schema", {})),
             ),
             templates=DomainTemplates(

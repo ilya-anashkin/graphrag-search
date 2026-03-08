@@ -29,7 +29,9 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(description="Ingest domain JSONL into Neo4j graph")
     parser.add_argument("--file", default=None, help="Path to JSONL input file")
-    parser.add_argument("--batch-size", type=int, default=None, help="Neo4j ingest batch size.")
+    parser.add_argument(
+        "--batch-size", type=int, default=None, help="Neo4j ingest batch size."
+    )
     return parser.parse_args()
 
 
@@ -76,10 +78,14 @@ def resolve_default_dataset_path() -> Path:
     )
 
 
-def chunk_rows(rows: list[dict[str, Any]], batch_size: int) -> list[list[dict[str, Any]]]:
+def chunk_rows(
+    rows: list[dict[str, Any]], batch_size: int
+) -> list[list[dict[str, Any]]]:
     """Split rows into fixed-size batches."""
 
-    return [rows[index : index + batch_size] for index in range(0, len(rows), batch_size)]
+    return [
+        rows[index : index + batch_size] for index in range(0, len(rows), batch_size)
+    ]
 
 
 async def ingest_graph(file_path: str, batch_size: int | None) -> None:
@@ -122,11 +128,15 @@ async def ingest_graph(file_path: str, batch_size: int | None) -> None:
     ingested = 0
     batches = chunk_rows(rows=rows, batch_size=resolved_batch_size)
     progress_bar = (
-        tqdm(total=len(batches), desc="Neo4j graph ingest", unit="batch") if tqdm else None
+        tqdm(total=len(batches), desc="Neo4j graph ingest", unit="batch")
+        if tqdm
+        else None
     )
 
     for batch in batches:
-        batch_succeeded, _batch_failed = await neo4j_adapter.ingest_documents(rows=batch)
+        batch_succeeded, _batch_failed = await neo4j_adapter.ingest_documents(
+            rows=batch
+        )
         ingested += len(batch_succeeded)
         if progress_bar is not None:
             progress_bar.update(1)

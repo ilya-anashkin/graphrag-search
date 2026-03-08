@@ -3,6 +3,7 @@
 from app.core.config import Settings
 from app.core.domain_loader import DomainArtifacts, DomainSearchConfig, DomainTemplates
 from app.models.schemas import IndexDocumentRequest, SearchItem
+from app.services.embedding_service import EmbeddingServiceError
 from app.services.search_service import SearchService
 
 
@@ -22,7 +23,9 @@ class FakeOpenSearchAdapter:
             }
         ]
 
-    async def vector_search(self, query_vector: list[float], limit: int) -> list[dict[str, object]]:
+    async def vector_search(
+        self, query_vector: list[float], limit: int
+    ) -> list[dict[str, object]]:
         """Return fake vector data."""
 
         return [
@@ -65,6 +68,17 @@ class FakeOpenSearchAdapter:
 
         succeeded_ids = [item[0] for item in items]
         return succeeded_ids, []
+
+
+class FakeOpenSearchAdapterNoVector(FakeOpenSearchAdapter):
+    """Fake OpenSearch adapter with unavailable vector channel."""
+
+    async def vector_search(
+        self, query_vector: list[float], limit: int
+    ) -> list[dict[str, object]]:
+        """Return empty vector results to simulate degraded mode."""
+
+        return []
 
 
 class FakeNeo4jAdapter:
@@ -111,7 +125,9 @@ class FakeNeo4jAdapter:
             for item_id in item_ids
         }
 
-    async def ingest_documents(self, rows: list[dict[str, object]]) -> tuple[list[str], list[str]]:
+    async def ingest_documents(
+        self, rows: list[dict[str, object]]
+    ) -> tuple[list[str], list[str]]:
         """Accept graph ingestion for provided rows."""
 
         succeeded = [str(row.get("id", "")) for row in rows if str(row.get("id", ""))]
@@ -121,6 +137,21 @@ class FakeNeo4jAdapter:
         """Return fake healthy state."""
 
         return True
+
+
+class FailingNeo4jAdapter(FakeNeo4jAdapter):
+    """Fake Neo4j adapter that returns no context."""
+
+    async def fetch_graph_context(
+        self,
+        item_ids: list[str],
+        person_limit: int = 5,
+        related_limit: int = 3,
+        shared_people_limit: int = 5,
+    ) -> dict[str, dict[str, object]]:
+        """Simulate graph expansion failure by returning empty context."""
+
+        return {}
 
 
 class FakeEmbeddingService:
@@ -148,6 +179,15 @@ class FakeEmbeddingService:
         """No-op close for interface compatibility."""
 
         return None
+
+
+class FailingEmbeddingService(FakeEmbeddingService):
+    """Fake embedding service that fails on query embedding."""
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Raise embedding error to trigger lexical-only fallback."""
+
+        raise EmbeddingServiceError("embedding backend unavailable")
 
 
 class FakeLLMService:
@@ -226,6 +266,7 @@ async def test_service_hybrid_merge_with_weights() -> None:
     assert result[0].debug["vector"]["normalized_score"] == 0.0
     assert result[0].debug["lexical"]["weighted_score"] == 0.7
     assert result[0].debug["vector"]["weighted_score"] == 0.0
+    assert result[0].debug["degraded_mode"] == "none"
     assert "graph" in result[0].payload
     assert "connections" in result[0].payload["graph"]
     assert "related_movies" in result[0].payload["graph"]
@@ -290,7 +331,9 @@ async def test_bulk_index_documents() -> None:
     payloads = [
         IndexDocumentRequest(id="movie-1", document={"movie": "One", "overview": "A"}),
         IndexDocumentRequest(id="movie-2", document={"movie": "Two", "overview": "B"}),
-        IndexDocumentRequest(id="movie-3", document={"movie": "Three", "overview": "C"}),
+        IndexDocumentRequest(
+            id="movie-3", document={"movie": "Three", "overview": "C"}
+        ),
     ]
     indexed_count, failed_ids = await service.index_documents_bulk(payloads=payloads)
     assert indexed_count == 3
@@ -313,16 +356,22 @@ async def test_answer_from_search_items() -> None:
     )
     result = await service.answer_from_search_items(
         question="Что посмотреть?",
-        items=[SearchItem(source="opensearch", id="movie-1", score=1.0, payload={}, debug={})],
+        items=[
+            SearchItem(
+                source="opensearch", id="movie-1", score=1.0, payload={}, debug={}
+            )
+        ],
     )
     assert str(result.get("answer", "")).startswith("llm:")
 
 
-async def test_search_filters_lexical_only_when_vector_enabled() -> None:
-    """Service should remove lexical-only items when vector channel is enabled."""
+async def test_search_degrades_to_lexical_when_vector_channel_returns_empty() -> None:
+    """Service should return lexical-only results when vector channel is unavailable."""
 
     class LexicalOnlyOpenSearchAdapter(FakeOpenSearchAdapter):
-        async def lexical_search(self, query: str, limit: int) -> list[dict[str, object]]:
+        async def lexical_search(
+            self, query: str, limit: int
+        ) -> list[dict[str, object]]:
             return [
                 {
                     "source": "opensearch",
@@ -348,4 +397,46 @@ async def test_search_filters_lexical_only_when_vector_enabled() -> None:
         domain_artifacts=build_domain_artifacts(),
     )
     result = await service.search(query="abc", limit=10)
-    assert result == []
+    assert [item.id for item in result] == ["doc-lex-only"]
+    assert result[0].debug["lexical"]["weight"] == 1.0
+    assert result[0].debug["vector"]["weight"] == 0.0
+    assert result[0].debug["degraded_mode"] == "lexical_only_no_vector"
+
+
+async def test_search_degrades_to_lexical_when_embedding_fails() -> None:
+    """Service should return lexical-only results when query embedding fails."""
+
+    settings = Settings(LEXICAL_SEARCH_WEIGHT=0.6, VECTOR_SEARCH_WEIGHT=0.4)
+    service = SearchService(
+        opensearch_adapter=FakeOpenSearchAdapter(),
+        neo4j_adapter=FakeNeo4jAdapter(),
+        embedding_service=FailingEmbeddingService(),
+        llm_service=FakeLLMService(),
+        settings=settings,
+        domain_artifacts=build_domain_artifacts(),
+    )
+    result = await service.search(query="abc", limit=10)
+    assert [item.id for item in result] == ["doc-1"]
+    assert result[0].debug["lexical"]["weight"] == 1.0
+    assert result[0].debug["vector"]["weight"] == 0.0
+    assert result[0].debug["degraded_mode"] == "lexical_only_no_embedding"
+
+
+async def test_search_returns_results_without_graph_when_graph_context_unavailable() -> (
+    None
+):
+    """Service should keep search results when graph enrichment is unavailable."""
+
+    settings = Settings(LEXICAL_SEARCH_WEIGHT=0.6, VECTOR_SEARCH_WEIGHT=0.4)
+    service = SearchService(
+        opensearch_adapter=FakeOpenSearchAdapter(),
+        neo4j_adapter=FailingNeo4jAdapter(),
+        embedding_service=FakeEmbeddingService(),
+        llm_service=FakeLLMService(),
+        settings=settings,
+        domain_artifacts=build_domain_artifacts(),
+    )
+    result = await service.search(query="abc", limit=10)
+    assert [item.id for item in result] == ["doc-1", "doc-2"]
+    assert "graph" not in result[0].payload
+    assert result[0].debug["degraded_mode"] == "no_graph_context"

@@ -78,14 +78,18 @@ class Neo4jAdapter:
     ) -> dict[str, dict[str, Any]]:
         """Execute domain graph context query and return map by item id."""
 
-        async with self._driver.session(database=self._settings.neo4j_database) as session:
+        async with self._driver.session(
+            database=self._settings.neo4j_database
+        ) as session:
             query_parameters = {
                 "item_ids": item_ids,
                 "person_limit": person_limit,
                 "related_limit": related_limit,
                 "shared_people_limit": shared_people_limit,
             }
-            cursor = await session.run(self._graph_context_query, parameters=query_parameters)
+            cursor = await session.run(
+                self._graph_context_query, parameters=query_parameters
+            )
             rows = await cursor.data()
             self._logger.info(
                 "neo4j_context_query_completed",
@@ -111,11 +115,15 @@ class Neo4jAdapter:
                         actors=actors,
                         countries=countries,
                     ),
-                    "related_movies": self._normalize_related_movies(row.get("related_movies", [])),
+                    "related_movies": self._normalize_related_movies(
+                        row.get("related_movies", [])
+                    ),
                 }
             return context_by_item_id
 
-    async def ingest_documents(self, rows: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    async def ingest_documents(
+        self, rows: list[dict[str, Any]]
+    ) -> tuple[list[str], list[str]]:
         """Insert domain documents into Neo4j as connected graph entities."""
 
         if not rows:
@@ -132,15 +140,21 @@ class Neo4jAdapter:
         except Exception as error:
             self._logger.error("neo4j_ingest_failed", error=str(error))
             failed_ids = [
-                str(row.get("id", "")).strip() for row in rows if str(row.get("id", "")).strip()
+                str(row.get("id", "")).strip()
+                for row in rows
+                if str(row.get("id", "")).strip()
             ]
             return [], failed_ids
 
-    async def _run_ingest_query(self, rows: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    async def _run_ingest_query(
+        self, rows: list[dict[str, Any]]
+    ) -> tuple[list[str], list[str]]:
         """Execute ingestion query with UNWIND batching payload."""
 
         normalized_rows = [self._normalize_ingest_row(row=row) for row in rows]
-        async with self._driver.session(database=self._settings.neo4j_database) as session:
+        async with self._driver.session(
+            database=self._settings.neo4j_database
+        ) as session:
             cursor = await session.run(
                 self._graph_ingest_query, parameters={"rows": normalized_rows}
             )
@@ -159,7 +173,9 @@ class Neo4jAdapter:
             "overview": str(row.get(config.graph_ingest_overview_field, "")),
             "year": self._to_int_or_none(row.get(config.graph_ingest_year_field)),
             "rating": self._to_int_or_none(row.get(config.graph_ingest_rating_field)),
-            "rating_ball": self._to_float_or_none(row.get(config.graph_ingest_rating_ball_field)),
+            "rating_ball": self._to_float_or_none(
+                row.get(config.graph_ingest_rating_ball_field)
+            ),
             "url_logo": str(row.get(config.graph_ingest_url_logo_field, "")),
             "countries": self._normalize_names(
                 raw_value=row.get(config.graph_ingest_country_field)
@@ -170,7 +186,9 @@ class Neo4jAdapter:
             "screenwriters": self._normalize_names(
                 raw_value=row.get(config.graph_ingest_screenwriter_field)
             ),
-            "actors": self._normalize_names(raw_value=row.get(config.graph_ingest_actor_field)),
+            "actors": self._normalize_names(
+                raw_value=row.get(config.graph_ingest_actor_field)
+            ),
         }
 
     def _normalize_name_list(self, values: Any) -> list[str]:
@@ -198,7 +216,9 @@ class Neo4jAdapter:
                 {
                     "id": movie_id,
                     "movie": movie_title,
-                    "shared_people_count": self._to_int_or_none(item.get("shared_people_count"))
+                    "shared_people_count": self._to_int_or_none(
+                        item.get("shared_people_count")
+                    )
                     or 0,
                     "shared_people_relations": self._normalize_shared_people_relations(
                         item.get("shared_people_relations", [])
@@ -339,7 +359,9 @@ class Neo4jAdapter:
         """Return True when Neo4j can answer a trivial query."""
 
         try:
-            async with self._driver.session(database=self._settings.neo4j_database) as session:
+            async with self._driver.session(
+                database=self._settings.neo4j_database
+            ) as session:
                 cursor = await session.run("RETURN 1 AS ok")
                 row = await cursor.single()
                 return bool(row and row.get("ok") == 1)
