@@ -116,6 +116,13 @@ def test_search(client: TestClient) -> None:
     assert "debug" in data["items"][0]
 
 
+def test_metrics_endpoint(client: TestClient) -> None:
+    """Verify metrics endpoint is exposed."""
+
+    response = client.get("/metrics")
+    assert response.status_code in {200, 503}
+
+
 def test_index_document(client: TestClient) -> None:
     """Verify document indexing endpoint."""
 

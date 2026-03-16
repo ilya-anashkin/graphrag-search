@@ -14,6 +14,74 @@ Or full stack with API:
 docker compose -f docker-compose.integration.yml up --build
 ```
 
+## HA Deployment
+
+Для отказоустойчивого запуска добавлены compose-файлы:
+
+- `docker-compose.base.yml` — базовые сервисы и общие конфигурации (`opensearch`, `neo4j`, шаблон `api`);
+- `docker-compose.ha.yml` — наследует базу и поднимает:
+  - `api-1`, `api-2`, `api-3`
+  - `api-lb` (Nginx, round-robin балансировка).
+
+Запуск:
+
+```bash
+make ha-up
+```
+
+Остановка:
+
+```bash
+make ha-down
+```
+
+Точка входа API в HA-режиме: `http://localhost:8000` (через Nginx LB).
+
+Контейнеры API используют два env-файла:
+
+- `.env` — основная конфигурация;
+- `.env.docker` — контейнерные override (сетевые адреса сервисов).
+
+В `.env.docker` по умолчанию уже настроено:
+
+- `OPENSEARCH_BASE_URL=http://opensearch:9200`
+- `NEO4J_URI=bolt://neo4j:7687`
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+- `LLM_BASE_URL=http://host.docker.internal:11434`
+
+## Load Testing Stack
+
+Проект поддерживает готовый контур для нагрузочного тестирования:
+
+- `Prometheus` (сбор метрик FastAPI)
+- `Grafana` (дашборд)
+- `Locust` (генерация нагрузки)
+- `Jaeger` (трейсинг запросов и внешних вызовов)
+
+Locust сценарии включают:
+- `POST /v1/search`
+- `POST /v1/documents/bulk` (батчи из `app/domains/movies/example_data/kinopoisk-top250.jsonl`)
+
+Запуск:
+
+```bash
+make ha-up
+```
+
+Доступ:
+
+- Locust UI: `http://localhost:8089`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (`admin/admin`)
+- cAdvisor: `http://localhost:8088`
+- Jaeger: `http://localhost:16686`
+- FastAPI metrics: `http://localhost:8000/metrics`
+
+Дашборд Grafana автоматически провиженится:
+
+- `GraphRAG Load Test Overview`
+  - поддерживает выбор `API Instance` (`All` или отдельный инстанс API).
+
 For local `sentence-transformers` embeddings, set in `.env`:
 
 ```dotenv

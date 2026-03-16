@@ -1,0 +1,390 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(rate(graphrag_http_requests_total{path=\"/v1/search\",instance=~\"$api_instance\"}[1m]))",
+          "legendFormat": "RPS /v1/search",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(graphrag_http_requests_total{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[1m]))",
+          "legendFormat": "RPS /v1/documents/bulk",
+          "refId": "B"
+        }
+      ],
+      "title": "RPS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p99 /v1/search",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p90 /v1/search",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p50 /v1/search",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p99 /v1/documents/bulk",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p90 /v1/documents/bulk",
+          "refId": "E"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "legendFormat": "p50 /v1/documents/bulk",
+          "refId": "F"
+        }
+      ],
+      "title": "Latency Quantiles (p99/p90/p50)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(graphrag_http_requests_in_progress{instance=~\"$api_instance\"})",
+          "legendFormat": "in-progress",
+          "refId": "A"
+        }
+      ],
+      "title": "In-Progress Requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(graphrag_http_requests_total{status=~\"5..\",instance=~\"$api_instance\"}[5m]))",
+          "legendFormat": "5xx rate",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(graphrag_http_requests_total{status=~\"4..\",instance=~\"$api_instance\"}[5m]))",
+          "legendFormat": "4xx rate",
+          "refId": "B"
+        }
+      ],
+      "title": "Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(rate(process_cpu_seconds_total{instance=~\"$api_instance\"}[1m]))",
+          "legendFormat": "CPU usage (process)",
+          "refId": "A"
+        }
+      ],
+      "title": "Application CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(process_resident_memory_bytes{instance=~\"$api_instance\"})",
+          "legendFormat": "RSS",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(process_virtual_memory_bytes{instance=~\"$api_instance\"})",
+          "legendFormat": "VMS",
+          "refId": "B"
+        }
+      ],
+      "title": "Application RAM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(rate(graphrag_http_request_size_bytes_total{instance=~\"$api_instance\"}[1m]))",
+          "legendFormat": "Ingress HTTP bytes/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(graphrag_http_response_size_bytes_total{instance=~\"$api_instance\"}[1m]))",
+          "legendFormat": "Egress HTTP bytes/s",
+          "refId": "B"
+        }
+      ],
+      "title": "Application Network (HTTP Payload)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container!=\"\"}[1m])) by (container_label_com_docker_compose_service)",
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Containers CPU (cores/sec)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{job=\"cadvisor\",container!=\"\"}) by (container_label_com_docker_compose_service)",
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Containers RAM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "sum(rate(container_network_receive_bytes_total{job=\"cadvisor\"}[1m])) by (name)",
+          "legendFormat": "RX {{name}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\"}[1m])) by (name)",
+          "legendFormat": "TX {{name}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Containers Network",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 40,
+  "style": "dark",
+  "tags": [
+    "graphrag",
+    "loadtest"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(graphrag_http_requests_total, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "API Instance",
+        "multi": false,
+        "name": "api_instance",
+        "options": [],
+        "query": {
+          "query": "label_values(graphrag_http_requests_total, instance)",
+          "refId": "Prometheus-api_instance-Variable-Query"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timezone": "",
+  "title": "GraphRAG Load Test Overview",
+  "uid": "graphrag-loadtest-overview",
+  "version": 1,
+  "weekStart": ""
+}
