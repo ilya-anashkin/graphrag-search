@@ -1,0 +1,125 @@
+services:
+  opensearch:
+    extends:
+      file: docker-compose.base.yml
+      service: opensearch
+    container_name: opensearch
+
+  neo4j:
+    extends:
+      file: docker-compose.base.yml
+      service: neo4j
+    container_name: neo4j
+
+  api-1:
+    extends:
+      file: docker-compose.base.yml
+      service: api
+    container_name: graphrag-api-1
+
+  api-2:
+    extends:
+      file: docker-compose.base.yml
+      service: api
+    container_name: graphrag-api-2
+
+  api-3:
+    extends:
+      file: docker-compose.base.yml
+      service: api
+    container_name: graphrag-api-3
+
+  api-lb:
+    image: nginx:1.27-alpine
+    container_name: graphrag-api-lb
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+      api-3:
+        condition: service_healthy
+    ports:
+      - "8000:80"
+    volumes:
+      - ./deploy/nginx/graphrag-api-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.61.0
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    profiles:
+      - loadtest
+
+  prometheus:
+    image: prom/prometheus:v3.7.1
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api-lb
+      - cadvisor
+      - jaeger
+    profiles:
+      - loadtest
+
+  grafana:
+    image: grafana/grafana:11.6.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    profiles:
+      - loadtest
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    container_name: cadvisor
+    ports:
+      - "8088:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    profiles:
+      - loadtest
+
+  locust:
+    image: locustio/locust:2.38.0
+    container_name: locust
+    command:
+      - "-f"
+      - "/mnt/locust/locustfile.py"
+      - "--host=http://api-lb"
+    volumes:
+      - ./loadtest:/mnt/locust:ro
+      - ./app/domains/movies/example_data:/mnt/domain-data:ro
+    ports:
+      - "8089:8089"
+    environment:
+      - LOCUST_BULK_DATASET_FILE=/mnt/domain-data/kinopoisk-top250.jsonl
+      - LOCUST_BULK_BATCH_SIZE=5
+      - LOCUST_BULK_SAMPLES_LIMIT=100
+    depends_on:
+      - api-lb
+    profiles:
+      - loadtest

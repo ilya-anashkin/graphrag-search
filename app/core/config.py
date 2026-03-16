@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     api_v1_prefix: str = Field(default="/v1", alias="API_V1_PREFIX")
     domain_name: str = Field(default="movies", alias="DOMAIN_NAME")
     domains_root: str = Field(default="app/domains", alias="DOMAINS_ROOT")
+    metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
+    metrics_path: str = Field(default="/metrics", alias="METRICS_PATH")
+    tracing_enabled: bool = Field(default=True, alias="TRACING_ENABLED")
+    tracing_service_name: str = Field(
+        default="graphrag-search-api", alias="TRACING_SERVICE_NAME"
+    )
+    tracing_otlp_endpoint: str = Field(
+        default="http://localhost:4318/v1/traces",
+        alias="TRACING_OTLP_ENDPOINT",
+    )
+    tracing_sampling_ratio: float = Field(default=1.0, alias="TRACING_SAMPLING_RATIO")
 
     api_timeout_seconds: float = Field(default=5.0, alias="API_TIMEOUT_SECONDS")
     opensearch_timeout_seconds: float = Field(

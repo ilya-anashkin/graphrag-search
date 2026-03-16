@@ -14,6 +14,7 @@ actor "Клиент\n(Web/CLI/Service)" as client
 rectangle "API слой" as api {
   [Search API] as search_api
   [Indexing API] as indexing_api
+  [Answer API] as answer_api
 }
 
 rectangle "Подсистема выполнения запросов" as query_subsystem {
@@ -24,6 +25,13 @@ rectangle "Подсистема выполнения запросов" as query_
   [Dense Retrieval\n(kNN/ANN)] as dense
   [Graph Expansion\n(GraphRAG)] as graph
   [Rank Fusion / Re-ranking\n(агрегация скорингов)] as fusion
+}
+
+rectangle "Подсистема LLM-ответа" as llm_subsystem {
+  [Context Assembler\n(подготовка контекста)] as ctx_asm
+  [Prompt Builder\n(шаблоны, инструкции)] as prompt_builder
+  [LLM Orchestrator\n(вызов модели)] as llm_orch
+  [Answer Postprocessor\n(нормализация ответа)] as answer_post
 }
 
 rectangle "Подсистема индексации и подготовки данных" as ingest_subsystem {
@@ -39,19 +47,24 @@ rectangle "Подсистема хранения и управления дан�
   database "Text Storage" as text_storage
   database "Vector Storage" as vec_storage
   database "Graph Storage" as graph_storage
+  database "Embedder Service" as embedder_service
+  database "LLM / Inference Service" as llm_service
 }
 
 ' ===== Client interactions =====
 client --> search_api
 client --> indexing_api
+client --> answer_api
 
 search_api --> orch
+answer_api --> ctx_asm
 orch --> qprep
 
 ' ===== Query pipeline =====
 qprep --> bm25
 qprep --> dense
 bm25 --> text_storage
+dense --> embedder_service
 dense --> vec_storage
 
 ' Merge candidates and expand via graph
@@ -60,6 +73,14 @@ graph --> graph_storage
 
 ' Final scoring + ranking
 orch --> fusion
+fusion --> ctx_asm
+
+' ===== LLM answer pipeline =====
+ctx_asm --> prompt_builder
+prompt_builder --> llm_orch
+llm_orch --> llm_service
+llm_service --> llm_orch
+llm_orch --> answer_post
 
 ' ===== Indexing pipeline =====
 indexing_api --> ingest
@@ -68,6 +89,7 @@ chunk --> tproc
 tproc --> text_storage
 
 chunk --> embed
+embed --> embedder_service
 embed --> vec_storage
 
 tproc --> ibuild

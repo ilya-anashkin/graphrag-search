@@ -1,13 +1,16 @@
 :root {
-  --bg: #f5f6f8;
-  --panel: #ffffff;
-  --border: #d9dee7;
-  --text: #1d2735;
-  --muted: #5f6f86;
-  --accent: #0f62fe;
-  --accent-dark: #0b4bc0;
-  --code-bg: #0f1724;
-  --code-text: #dbe6ff;
+  --bg-start: #0a101c;
+  --bg-end: #111a2a;
+  --panel: #141f31;
+  --panel-elevated: #18253b;
+  --border: #2a3954;
+  --text: #e6eefc;
+  --muted: #9cb0cf;
+  --accent: #3d7fff;
+  --accent-dark: #2d66d6;
+  --accent-soft: rgba(61, 127, 255, 0.2);
+  --code-bg: #0d1524;
+  --code-text: #d5e4ff;
 }
 
 * {
@@ -16,8 +19,9 @@
 
 body {
   margin: 0;
-  font-family: "SF Pro Text", "Segoe UI", sans-serif;
-  background: linear-gradient(180deg, #f7f8fb 0%, #eef2f8 100%);
+  font-family: "Manrope", "IBM Plex Sans", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 15% 0%, #1a2741 0%, transparent 35%),
+    linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%);
   color: var(--text);
 }
 
@@ -35,6 +39,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
   min-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
@@ -73,6 +78,14 @@ input {
   border-radius: 8px;
   padding: 0 10px;
   font-size: 14px;
+  color: var(--text);
+  background: var(--panel-elevated);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .row {
@@ -95,10 +108,16 @@ button {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 button:hover {
   background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 .block {
@@ -113,7 +132,7 @@ button:hover {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  background: #f9fbff;
+  background: var(--panel-elevated);
 }
 
 .code {
@@ -137,4 +156,3 @@ button:hover {
     min-height: auto;
   }
 }
-

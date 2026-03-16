@@ -13,7 +13,9 @@ from app.api.routes import get_search_service, router
 from app.core.config import Settings, get_settings
 from app.core.domain_loader import DomainLoader
 from app.core.logging import configure_logging, get_logger
+from app.core.metrics import setup_metrics
 from app.core.request_id import request_id_middleware
+from app.core.tracing import setup_tracing, shutdown_tracing
 from app.frontend.routes import STATIC_DIR
 from app.frontend.routes import router as frontend_router
 from app.services.embedding_service import EmbeddingService
@@ -114,6 +116,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await app.state.container.warmup()
     yield
     await app.state.container.close()
+    shutdown_tracing(logger=get_logger(__name__))
 
 
 def create_app() -> FastAPI:
@@ -122,6 +125,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
     _add_middlewares(app=app, settings=settings)
+    setup_tracing(app=app, settings=settings, logger=get_logger(__name__))
+    if settings.metrics_enabled:
+        setup_metrics(app=app, metrics_path=settings.metrics_path)
 
     app.dependency_overrides[get_search_service] = _resolve_search_service
     app.include_router(router, prefix=settings.api_v1_prefix)
