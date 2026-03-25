@@ -88,22 +88,27 @@ class LLMService:
     ) -> dict[str, str | None]:
         """Generate answer from search items and question."""
 
-        sorted_items = sorted(items, key=lambda item: item.score, reverse=True)
-        context = self._build_context(items=sorted_items, limit=len(sorted_items))
-        data_schema = self._build_data_schema(items=sorted_items)
-        allowed_ids = [item.id for item in sorted_items]
-        prompt = self._render_prompt(
-            question=question,
-            context=context,
-            data_schema=data_schema,
-            allowed_ids=allowed_ids,
-        )
+        prompt = self._build_prompt(question=question, items=items)
 
         if self._provider == LLM_PROVIDER_OLLAMA:
             raw_answer = await self._call_ollama_generate(prompt=prompt)
             return self._postprocess_answer(raw_answer=raw_answer)
 
         raise LLMServiceError(f"Unsupported llm provider: {self._provider}")
+
+    def _build_prompt(self, question: str, items: list[SearchItem]) -> str:
+        """Build model prompt from sorted search items."""
+
+        sorted_items = sorted(items, key=lambda item: item.score, reverse=True)
+        context = self._build_context(items=sorted_items, limit=len(sorted_items))
+        data_schema = self._build_data_schema(items=sorted_items)
+        allowed_ids = [item.id for item in sorted_items]
+        return self._render_prompt(
+            question=question,
+            context=context,
+            data_schema=data_schema,
+            allowed_ids=allowed_ids,
+        )
 
     def _build_context(self, items: list[SearchItem], limit: int) -> str:
         """Build JSON context block from top search items."""

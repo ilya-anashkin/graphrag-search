@@ -71,12 +71,23 @@ async function askModel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const body = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const bodyText = await response.text();
     if (!response.ok) {
-      throw new Error(pretty(body));
+      throw new Error(bodyText || `HTTP ${response.status}`);
     }
-    llmAnswerEl.textContent = body.answer || "";
-    llmThinkEl.textContent = body.think || "";
+    if (contentType.includes("application/json")) {
+      try {
+        const body = JSON.parse(bodyText);
+        llmAnswerEl.textContent = body.answer || bodyText;
+        llmThinkEl.textContent = body.think || "";
+        return;
+      } catch (error) {
+        // Fall through to raw output.
+      }
+    }
+    llmAnswerEl.textContent = bodyText;
+    llmThinkEl.textContent = "";
   } catch (error) {
     llmAnswerEl.textContent = `Ask error:\n${String(error)}`;
     llmThinkEl.textContent = "";
@@ -85,4 +96,3 @@ async function askModel() {
 
 searchForm.addEventListener("submit", runSearch);
 askButton.addEventListener("click", askModel);
-

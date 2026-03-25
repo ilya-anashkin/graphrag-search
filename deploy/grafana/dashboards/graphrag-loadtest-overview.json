@@ -61,32 +61,32 @@
       "id": 2,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p99 /v1/search",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p90 /v1/search",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p50 /v1/search",
           "refId": "C"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p99 /v1/documents/bulk",
           "refId": "D"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p90 /v1/documents/bulk",
           "refId": "E"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
           "legendFormat": "p50 /v1/documents/bulk",
           "refId": "F"
         }
@@ -375,6 +375,48 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "5m",
+          "value": "5m"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Latency Window",
+        "multi": false,
+        "name": "latency_window",
+        "options": [
+          {
+            "selected": false,
+            "text": "30s",
+            "value": "30s"
+          },
+          {
+            "selected": false,
+            "text": "1m",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "2m",
+            "value": "2m"
+          },
+          {
+            "selected": true,
+            "text": "5m",
+            "value": "5m"
+          },
+          {
+            "selected": false,
+            "text": "10m",
+            "value": "10m"
+          }
+        ],
+        "query": "30s,1m,2m,5m,10m",
+        "skipUrlSync": false,
+        "type": "custom"
       }
     ]
   },
