@@ -1,0 +1,44 @@
+@startuml
+' System Architecture with concrete technologies
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 220
+skinparam maxMessageSize 200
+
+title Архитектура системы
+
+actor "Клиент\n(Web/CLI/Service)" as client
+
+rectangle "Edge / Балансировка" as edge {
+  [Nginx LB] as nginx
+}
+
+rectangle "API слой (Python/FastAPI)" as api {
+  [API Instance #1] as api1
+  [API Instance #2] as api2
+  [API Instance #3] as api3
+}
+
+rectangle "Хранилища и внешние сервисы" as data {
+  database "OpenSearch" as os
+  database "Neo4j" as neo
+  database "Ollama\n(Embeddings + LLM)" as ollama
+}
+
+rectangle "Наблюдаемость и нагрузка" as obs {
+  [Prometheus] as prom
+  [Grafana] as graf
+  [Jaeger] as jaeger
+  [cAdvisor] as cadvisor
+  [Locust] as locust
+}
+
+' === Request path (representative flow) ===
+client --> nginx
+nginx --> api1
+api1 --> os
+api1 --> neo
+api1 --> ollama
+
+@enduml

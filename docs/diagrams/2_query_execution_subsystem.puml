@@ -1,54 +1,54 @@
 @startuml
-title Графовое расширение (GraphRAG) в системе
+title Подсистема выполнения запросов (поиск)
 
 actor "Клиент системы" as Client
-participant "FastAPI\nPOST /v1/documents/bulk" as IndexAPI
 participant "FastAPI\nPOST /v1/search" as SearchAPI
-participant "FastAPI\nPOST /v1/ask" as AskAPI
-participant "SearchService" as Service
-participant "Neo4jAdapter" as Neo
-participant "LLMService" as LLM
+participant "SearchService\nsearch" as Service
+participant "EmbeddingService\nembed_text" as Emb
+participant "OpenSearchAdapter\nlexical_search / vector_search" as OS
+participant "Neo4jAdapter\nfetch_graph_context" as Neo
+database "OpenSearch" as OSDb
 database "Neo4j" as NeoDb
-participant "Ollama API\n/api/generate" as Ollama
 
-group 1) Формирование графа при индексации
-  Client -> IndexAPI: POST /v1/documents/bulk {items}
-  IndexAPI -> Service: index_documents_bulk(payloads)
-  Service -> Service: after OpenSearch success,\nselect succeeded_ids
-  Service -> Neo: ingest_documents(rows for succeeded_ids)
-  Neo -> Neo: normalize rows by domain graph ingest mapping
-  Neo -> NeoDb: run rendered graph_ingest Cypher template
-  NeoDb --> Neo: write result
-  Neo --> Service: graph succeeded_ids / failed_ids
-  Service --> IndexAPI: indexed, failed_ids
+Client -> SearchAPI: POST /v1/search {query, limit, lexical_weight?, vector_weight?}
+SearchAPI -> Service: search(query, limit, lexical_weight, vector_weight)
+
+Service -> Service: resolve_weights()
+Service -> OS: lexical_search(query, lexical_limit)
+OS -> OSDb: POST /{index}/_search/template (lexical)
+OSDb --> OS: lexical hits
+OS --> Service: lexical_results
+
+alt vector weight > 0
+  Service -> Emb: embed_text(query)
+  alt query embedding failed
+    Service -> Service: degrade to lexical-only\n(effective weights: 1.0 / 0.0)
+  else embedding ok
+    Service -> OS: vector_search(query_vector, vector_limit)
+    OS -> OSDb: POST /{index}/_search/template (vector)
+    OSDb --> OS: vector hits (or empty)
+    OS --> Service: vector_results
+    alt vector results empty/failed
+      Service -> Service: degrade to lexical-only\n(effective weights: 1.0 / 0.0)
+    end
+  end
+else vector weight == 0
+  Service -> Service: lexical-only mode by config/request
 end
 
-group 2) Графовое расширение в поиске
-  Client -> SearchAPI: POST /v1/search {query, limit, ...}
-  SearchAPI -> Service: search(...)
-  Service -> Service: build lexical+vector ranking
+Service -> Service: normalize lexical scores (min-max)
+Service -> Service: normalize vector scores (min-max)
+Service -> Service: merge weighted results\n(build debug lexical/vector/combined)
+Service -> Service: filter lexical-only with vector_raw=0\nonly when vector channel is active
+Service -> Service: sort by combined score desc
+Service -> Service: take top limit
 
-  Service -> Neo: fetch_graph_context(item_ids, limits)
-  Neo -> NeoDb: run rendered graph_context Cypher template
-  NeoDb --> Neo: graph rows (or error)
-  Neo --> Service: graph_context_map (may be empty)
-  Service -> Service: attach payload.graph\n(connections, ...)\nfor matched items
-
-  Service --> SearchAPI: SearchItem[] (with/without payload.graph)
-  SearchAPI --> Client: SearchResponse
-end
-
-group 3) Использование граф-контекста в LLM-ответе
-  Client -> AskAPI: POST /v1/ask {question, items}
-  AskAPI -> Service: answer_from_search_items(question, items)
-  Service -> LLM: answer_from_items(question, items)
-  LLM -> LLM: compact graph from payload.graph\n(connections, ...)
-  LLM -> LLM: render prompt with context+schema
-  LLM -> Ollama: POST /api/generate
-  Ollama --> LLM: response
-  LLM --> Service: {answer, think}
-  Service --> AskAPI: {answer, think}
-  AskAPI --> Client: AskResponse
-end
+Service -> Neo: fetch_graph_context(item_ids, limits)
+Neo -> NeoDb: execute rendered graph_context Cypher template
+NeoDb --> Neo: context rows (or error)
+Neo --> Service: graph_context_map (may be empty)
+Service -> Service: attach payload.graph only for items\npresent in graph_context_map
+Service --> SearchAPI: enriched_items
+SearchAPI --> Client: SearchResponse(items)
 
 @enduml
