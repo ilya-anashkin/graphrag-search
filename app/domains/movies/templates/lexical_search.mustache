@@ -1,22 +1,55 @@
 {
-  "size": {{size}},
-  "_source": {
-    "excludes": ["{{vector_field}}"]
-  },
-  "query": {
-    "multi_match": {
-      "query": "{{query_text}}",
-      "type": "cross_fields",
-      "operator": "or",
-      "minimum_should_match": "60%",
-      "fields": [
-        "movie^3",
-        "overview",
-        "actors",
-        "director",
-        "screenwriter",
-        "country"
-      ]
+	"size": {{size}},
+	"_source": {
+		"excludes": ["{{vector_field}}"]
+	},
+  	"query": {
+        "bool": {
+            "minimum_should_match": 1,
+            "should": [
+                {
+                    "multi_match": {
+                        "query": "{{query_text}}",
+                        "type": "cross_fields",
+                        "operator": "and",
+                        "fields": [
+                            "movie.light^6",
+                            "movie^5",
+                            "overview.light^4",
+                            "overview^3",
+                            "actors.light^2",
+                            "actors",
+                            "director.light^2",
+                            "director",
+                            "screenwriter.light^2",
+                            "screenwriter",
+                            "country"
+                        ],
+                        "boost": 2
+                    }
+                },
+                {
+                    "multi_match": {
+                        "query": "{{query_text}}",
+                        "type": "cross_fields",
+                        "operator": "or",
+                        "fields": [
+                            "movie.light^6",
+                            "movie^5",
+                            "overview.light^4",
+                            "overview^3",
+                            "actors.light^2",
+                            "actors",
+                            "director.light^2",
+                            "director",
+                            "screenwriter.light^2",
+                            "screenwriter",
+                            "country"
+                        ],
+                        "boost": 1
+                    }
+                }
+            ]
+        }
     }
-  }
 }
