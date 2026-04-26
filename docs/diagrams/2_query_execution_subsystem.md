@@ -20,7 +20,6 @@
   - `none`;
   - `lexical_only_no_embedding`;
   - `lexical_only_no_vector`;
-- фильтрация документов с чисто лексическим сигналом при нулевом vector raw score (только когда vector-канал реально активен);
 - сортировка по combined score и ограничение `limit`.
 
 3. Графовое обогащение результатов:

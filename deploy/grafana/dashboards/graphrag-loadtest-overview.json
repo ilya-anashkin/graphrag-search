@@ -28,14 +28,9 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(graphrag_http_requests_total{path=\"/v1/search\",instance=~\"$api_instance\"}[1m]))",
+          "expr": "sum(rate(graphrag_http_requests_total{path=\"/v1/search\",instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "RPS /v1/search",
           "refId": "A"
-        },
-        {
-          "expr": "sum(rate(graphrag_http_requests_total{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[1m]))",
-          "legendFormat": "RPS /v1/documents/bulk",
-          "refId": "B"
         }
       ],
       "title": "RPS",
@@ -61,37 +56,22 @@
       "id": 2,
       "targets": [
         {
-          "expr": "(histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
+          "expr": "(histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$metrics_window])) by (le)))",
           "legendFormat": "p99 /v1/search",
           "refId": "A"
         },
         {
-          "expr": "(histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
-          "legendFormat": "p90 /v1/search",
+          "expr": "(histogram_quantile(0.95, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$metrics_window])) by (le)))",
+          "legendFormat": "p95 /v1/search",
           "refId": "B"
         },
         {
-          "expr": "(histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
+          "expr": "(histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/search\",instance=~\"$api_instance\"}[$metrics_window])) by (le)))",
           "legendFormat": "p50 /v1/search",
           "refId": "C"
-        },
-        {
-          "expr": "(histogram_quantile(0.99, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
-          "legendFormat": "p99 /v1/documents/bulk",
-          "refId": "D"
-        },
-        {
-          "expr": "(histogram_quantile(0.90, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
-          "legendFormat": "p90 /v1/documents/bulk",
-          "refId": "E"
-        },
-        {
-          "expr": "(histogram_quantile(0.50, sum(rate(graphrag_http_request_duration_seconds_bucket{path=\"/v1/documents/bulk\",instance=~\"$api_instance\"}[$latency_window])) by (le)))",
-          "legendFormat": "p50 /v1/documents/bulk",
-          "refId": "F"
         }
       ],
-      "title": "Latency Quantiles (p99/p90/p50)",
+      "title": "Latency Quantiles (p99/p95/p50)",
       "type": "timeseries"
     },
     {
@@ -101,7 +81,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "min": 0
         },
         "overrides": []
       },
@@ -114,7 +95,7 @@
       "id": 3,
       "targets": [
         {
-          "expr": "sum(graphrag_http_requests_in_progress{instance=~\"$api_instance\"})",
+          "expr": "sum(avg_over_time(graphrag_http_requests_in_progress{instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "in-progress",
           "refId": "A"
         }
@@ -129,7 +110,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "percentunit",
+          "min": 0
         },
         "overrides": []
       },
@@ -142,13 +124,13 @@
       "id": 4,
       "targets": [
         {
-          "expr": "sum(rate(graphrag_http_requests_total{status=~\"5..\",instance=~\"$api_instance\"}[5m]))",
-          "legendFormat": "5xx rate",
+          "expr": "sum(rate(graphrag_http_requests_total{status=~\"5..\",instance=~\"$api_instance\"}[$metrics_window])) / clamp_min(sum(rate(graphrag_http_requests_total{instance=~\"$api_instance\"}[$metrics_window])), 1e-9)",
+          "legendFormat": "5xx error rate",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(graphrag_http_requests_total{status=~\"4..\",instance=~\"$api_instance\"}[5m]))",
-          "legendFormat": "4xx rate",
+          "expr": "sum(rate(graphrag_http_requests_total{status=~\"4..\",instance=~\"$api_instance\"}[$metrics_window])) / clamp_min(sum(rate(graphrag_http_requests_total{instance=~\"$api_instance\"}[$metrics_window])), 1e-9)",
+          "legendFormat": "4xx error rate",
           "refId": "B"
         }
       ],
@@ -162,7 +144,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -175,12 +157,12 @@
       "id": 5,
       "targets": [
         {
-          "expr": "sum(rate(process_cpu_seconds_total{instance=~\"$api_instance\"}[1m]))",
-          "legendFormat": "CPU usage (process)",
+          "expr": "sum(rate(process_cpu_seconds_total{instance=~\"$api_instance\"}[$metrics_window]))",
+          "legendFormat": "CPU cores",
           "refId": "A"
         }
       ],
-      "title": "Application CPU",
+      "title": "Application CPU (cores)",
       "type": "timeseries"
     },
     {
@@ -203,12 +185,12 @@
       "id": 6,
       "targets": [
         {
-          "expr": "sum(process_resident_memory_bytes{instance=~\"$api_instance\"})",
+          "expr": "sum(avg_over_time(process_resident_memory_bytes{instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "RSS",
           "refId": "A"
         },
         {
-          "expr": "sum(process_virtual_memory_bytes{instance=~\"$api_instance\"})",
+          "expr": "sum(avg_over_time(process_virtual_memory_bytes{instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "VMS",
           "refId": "B"
         }
@@ -236,12 +218,12 @@
       "id": 7,
       "targets": [
         {
-          "expr": "sum(rate(graphrag_http_request_size_bytes_total{instance=~\"$api_instance\"}[1m]))",
+          "expr": "sum(rate(graphrag_http_request_size_bytes_total{instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "Ingress HTTP bytes/s",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(graphrag_http_response_size_bytes_total{instance=~\"$api_instance\"}[1m]))",
+          "expr": "sum(rate(graphrag_http_response_size_bytes_total{instance=~\"$api_instance\"}[$metrics_window]))",
           "legendFormat": "Egress HTTP bytes/s",
           "refId": "B"
         }
@@ -269,7 +251,7 @@
       "id": 8,
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container!=\"\"}[1m])) by (container_label_com_docker_compose_service)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container!=\"\"}[$metrics_window])) by (container_label_com_docker_compose_service)",
           "legendFormat": "{{container_label_com_docker_compose_service}}",
           "refId": "A"
         }
@@ -297,12 +279,12 @@
       "id": 9,
       "targets": [
         {
-          "expr": "sum(container_memory_working_set_bytes{job=\"cadvisor\",container!=\"\"}) by (container_label_com_docker_compose_service)",
+          "expr": "sum(avg_over_time(container_memory_working_set_bytes{job=\"cadvisor\",container!=\"\"}[$metrics_window])) by (container_label_com_docker_compose_service)",
           "legendFormat": "{{container_label_com_docker_compose_service}}",
           "refId": "A"
         }
       ],
-      "title": "Containers RAM",
+      "title": "Containers RAM (working set)",
       "type": "timeseries"
     },
     {
@@ -325,12 +307,12 @@
       "id": 10,
       "targets": [
         {
-          "expr": "sum(rate(container_network_receive_bytes_total{job=\"cadvisor\"}[1m])) by (name)",
+          "expr": "sum(rate(container_network_receive_bytes_total{job=\"cadvisor\"}[$metrics_window])) by (name)",
           "legendFormat": "RX {{name}}",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\"}[1m])) by (name)",
+          "expr": "sum(rate(container_network_transmit_bytes_total{job=\"cadvisor\"}[$metrics_window])) by (name)",
           "legendFormat": "TX {{name}}",
           "refId": "B"
         }
@@ -384,9 +366,9 @@
         },
         "hide": 0,
         "includeAll": false,
-        "label": "Latency Window",
+        "label": "Metrics Window",
         "multi": false,
-        "name": "latency_window",
+        "name": "metrics_window",
         "options": [
           {
             "selected": false,
@@ -427,6 +409,6 @@
   "timezone": "",
   "title": "GraphRAG Load Test Overview",
   "uid": "graphrag-loadtest-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

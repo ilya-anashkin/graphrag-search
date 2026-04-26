@@ -1,6 +1,7 @@
 {
   "index": {
     "settings": {
+      "number_of_replicas": 0,
       "index": {
         "knn": true
       },
@@ -60,7 +61,17 @@
           }
         },
         "analyzer": {
-          "ru_en_text_index": {
+          "light_text_index": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "ru_stop", "movies_domain_stop"]
+          },
+          "light_text_search": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase", "ru_stop", "movies_domain_stop"]
+          },
+          "strong_text_index": {
             "type": "custom",
             "tokenizer": "standard",
             "filter": [
@@ -71,7 +82,7 @@
               "en_stemmer"
             ]
           },
-          "ru_en_text_search": {
+          "strong_text_search": {
             "type": "custom",
             "tokenizer": "standard",
             "filter": [
@@ -90,38 +101,75 @@
         "rating": { "type": "integer" },
         "movie": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search",
+          "analyzer": "strong_text_index",
+          "search_analyzer": "strong_text_search",
           "fields": {
+            "light": {
+              "type": "text",
+              "analyzer": "light_text_index",
+              "search_analyzer": "light_text_search"
+            },
             "keyword": { "type": "keyword" }
           }
         },
         "year": { "type": "integer" },
         "country": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search"
+          "analyzer": "light_text_index",
+          "search_analyzer": "light_text_search"
         },
         "rating_ball": { "type": "float" },
         "overview": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search"
+          "analyzer": "strong_text_index",
+          "search_analyzer": "strong_text_search",
+          "fields": {
+            "light": {
+              "type": "text",
+              "analyzer": "light_text_index",
+              "search_analyzer": "light_text_search"
+            },
+            "keyword": { "type": "keyword" }
+          }
         },
         "director": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search"
+          "analyzer": "strong_text_index",
+          "search_analyzer": "strong_text_search",
+          "fields": {
+            "light": {
+              "type": "text",
+              "analyzer": "light_text_index",
+              "search_analyzer": "light_text_search"
+            },
+            "keyword": { "type": "keyword" }
+          }
         },
         "screenwriter": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search"
+          "analyzer": "strong_text_index",
+          "search_analyzer": "strong_text_search",
+          "fields": {
+            "light": {
+              "type": "text",
+              "analyzer": "light_text_index",
+              "search_analyzer": "light_text_search"
+            },
+            "keyword": { "type": "keyword" }
+          }
         },
         "actors": {
           "type": "text",
-          "analyzer": "ru_en_text_index",
-          "search_analyzer": "ru_en_text_search"
+          "analyzer": "strong_text_index",
+          "search_analyzer": "strong_text_search",
+          "fields": {
+            "light": {
+              "type": "text",
+              "analyzer": "light_text_index",
+              "search_analyzer": "light_text_search"
+            },
+            "keyword": { "type": "keyword" }
+          }
         },
         "url_logo": { "type": "keyword" }
       }
@@ -159,11 +207,11 @@
         "fields": {
           "id": {
             "type": "string",
-            "description": "Уникальный идентификатор фильма в формате movie-<id>."
+            "description": "Уникальный идентификатор фильма."
           },
           "score": {
             "type": "float",
-            "description": "Итоговый комбинированный score (lexical + vector)."
+            "description": "Итоговый комбинированный score."
           },
           "payload": {
             "type": "object",
@@ -187,7 +235,7 @@
               },
               "rating_ball": {
                 "type": "float",
-                "description": "Оценка на kinopoisk.ru."
+                "description": "Оценка на kinopoisk."
               },
               "overview": {
                 "type": "string",

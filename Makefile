@@ -12,14 +12,16 @@ LOG_LEVEL ?= info
 
 DOMAIN_NAME ?= movies
 DATASET_FILE ?=
+DATASET_MULTIPLIER ?= 10
 
-.PHONY: help install run ingest-domain-data test lint infra-up infra-down ha-up ha-down
+.PHONY: help install run ingest-domain-data ingest-domain-data-expanded test lint infra-up infra-down ha-up ha-down
 
 help:
 	@echo "Available targets:"
 	@echo "  install        - Install Python dependencies"
 	@echo "  run            - Run API locally from terminal"
 	@echo "  ingest-domain-data  - Ingest DOMAIN_NAME JSONL via bulk API"
+	@echo "  ingest-domain-data-expanded  - Ingest replicated DOMAIN_NAME JSONL via bulk API"
 	@echo "  test           - Run pytest"
 	@echo "  lint           - Run black checks"
 	@echo "  infra-up       - Start OpenSearch + Neo4j (docker-compose.yml)"
@@ -35,8 +37,11 @@ install:
 run:
 	$(UVICORN) $(APP_MODULE) --host $(APP_HOST) --port $(APP_PORT) --log-level $(LOG_LEVEL)
 
-ingest-domain-data:
+ingest-data:
 	DOMAIN_NAME=$(DOMAIN_NAME) PYTHONPATH=. $(PYTHON) app/domains/movies/scripts/ingest_movies_jsonl.py $(if $(DATASET_FILE),--file $(DATASET_FILE),)
+
+ingest-data-expanded:
+	DOMAIN_NAME=$(DOMAIN_NAME) PYTHONPATH=. $(PYTHON) app/domains/movies/scripts/ingest_movies_jsonl_expanded.py --multiplier $(DATASET_MULTIPLIER) $(if $(DATASET_FILE),--file $(DATASET_FILE),)
 
 test:
 	$(PYTHON) -m pytest
@@ -52,7 +57,6 @@ infra-down:
 
 ha-up:
 	$(DOCKER_COMPOSE) -f docker-compose.base.yml -f docker-compose.ha.yml --profile loadtest up -d --build
-	$(MAKE) ingest-domain-data DOMAIN_NAME=$(DOMAIN_NAME) DATASET_FILE=$(DATASET_FILE)
 
 ha-down:
 	$(DOCKER_COMPOSE) -f docker-compose.base.yml -f docker-compose.ha.yml --profile loadtest down

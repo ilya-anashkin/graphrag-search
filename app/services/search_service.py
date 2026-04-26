@@ -21,6 +21,9 @@ DEGRADED_MODE_NONE = "none"
 DEGRADED_MODE_LEXICAL_ONLY_NO_EMBEDDING = "lexical_only_no_embedding"
 DEGRADED_MODE_LEXICAL_ONLY_NO_VECTOR = "lexical_only_no_vector"
 DEGRADED_MODE_NO_GRAPH_CONTEXT = "no_graph_context"
+SEARCH_MODE_LEXICAL = "lexical"
+SEARCH_MODE_LEXICAL_VECTOR = "lexical_vector"
+SEARCH_MODE_LEXICAL_VECTOR_GRAPH = "lexical_vector_graph"
 
 
 class SearchService:
@@ -231,6 +234,7 @@ class SearchService:
         limit: int,
         lexical_weight: float | None = None,
         vector_weight: float | None = None,
+        search_mode: str = SEARCH_MODE_LEXICAL_VECTOR_GRAPH,
     ) -> list[SearchItem]:
         """Run lexical and vector searches and return weighted merged results."""
 
@@ -238,6 +242,7 @@ class SearchService:
             lexical_weight=lexical_weight,
             vector_weight=vector_weight,
         )
+        enable_vector, enable_graph = self._resolve_search_mode(search_mode=search_mode)
         degraded_mode = DEGRADED_MODE_NONE
 
         lexical_limit = max(limit, self._settings.lexical_candidate_size)
@@ -247,7 +252,7 @@ class SearchService:
         vector_results: list[dict[str, Any]] = []
         vector_channel_available = False
 
-        if resolved_vector_weight > 0:
+        if enable_vector and resolved_vector_weight > 0:
             vector_limit = max(limit, self._settings.vector_candidate_size)
             try:
                 query_embedding = await self._embedding_service.embed_text(query)
@@ -271,7 +276,7 @@ class SearchService:
 
         effective_lexical_weight = resolved_lexical_weight
         effective_vector_weight = resolved_vector_weight
-        if not vector_channel_available:
+        if not enable_vector or not vector_channel_available:
             effective_lexical_weight = 1.0
             effective_vector_weight = 0.0
 
@@ -284,36 +289,14 @@ class SearchService:
             lexical_weight=effective_lexical_weight,
             vector_weight=effective_vector_weight,
         )
-        filtered_items = self._filter_lexical_only_without_vector_signal(
-            items=weighted_items.values(),
-            vector_weight=effective_vector_weight,
+        sorted_items = sorted(
+            weighted_items.values(), key=lambda item: item.score, reverse=True
         )
-
-        sorted_items = sorted(filtered_items, key=lambda item: item.score, reverse=True)
         limited_items = sorted_items[:limit]
         self._apply_degraded_mode(items=limited_items, degraded_mode=degraded_mode)
+        if not enable_graph:
+            return limited_items
         return await self._enrich_with_graph_context(items=limited_items)
-
-    def _filter_lexical_only_without_vector_signal(
-        self,
-        items: Iterable[SearchItem],
-        vector_weight: float,
-    ) -> list[SearchItem]:
-        """Drop lexical-only documents when vector channel is enabled but has zero signal."""
-
-        if vector_weight <= 0:
-            return list(items)
-
-        filtered: list[SearchItem] = []
-        for item in items:
-            lexical_debug = item.debug.get(CHANNEL_LEXICAL, {})
-            vector_debug = item.debug.get(CHANNEL_VECTOR, {})
-            lexical_raw = float(lexical_debug.get("raw_score", 0.0))
-            vector_raw = float(vector_debug.get("raw_score", 0.0))
-            if lexical_raw > 0.0 and vector_raw == 0.0:
-                continue
-            filtered.append(item)
-        return filtered
 
     async def _enrich_with_graph_context(
         self, items: list[SearchItem]
@@ -387,6 +370,16 @@ class SearchService:
             resolved_lexical_weight / total_weight,
             resolved_vector_weight / total_weight,
         )
+
+    def _resolve_search_mode(self, search_mode: str) -> tuple[bool, bool]:
+        """Resolve enabled vector and graph channels for requested mode."""
+
+        normalized_mode = search_mode.strip().lower()
+        if normalized_mode == SEARCH_MODE_LEXICAL:
+            return False, False
+        if normalized_mode == SEARCH_MODE_LEXICAL_VECTOR:
+            return True, False
+        return True, True
 
     def _normalize_channel_scores(
         self, results: list[dict[str, Any]]

@@ -1,10 +1,10 @@
 services:
   opensearch:
-    image: opensearchproject/opensearch:2.17.1
+    image: opensearchproject/opensearch:3.5.0
     environment:
       - discovery.type=single-node
       - plugins.security.disabled=true
-      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - OPENSEARCH_JAVA_OPTS=-Xms1024m -Xmx1024m
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=v}Jp&0b7@+UOL2I
     ports:
       - "9200:9200"
@@ -16,7 +16,7 @@ services:
       start_period: 20s
 
   neo4j:
-    image: neo4j:5.26.0
+    image: neo4j:5.26.23
     environment:
       - NEO4J_AUTH=neo4j/password
     ports:

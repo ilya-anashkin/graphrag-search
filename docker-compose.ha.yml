@@ -112,13 +112,12 @@ services:
       - "--host=http://api-lb"
     volumes:
       - ./loadtest:/mnt/locust:ro
-      - ./app/domains/movies/example_data:/mnt/domain-data:ro
     ports:
       - "8089:8089"
     environment:
-      - LOCUST_BULK_DATASET_FILE=/mnt/domain-data/kinopoisk-top250.jsonl
-      - LOCUST_BULK_BATCH_SIZE=5
-      - LOCUST_BULK_SAMPLES_LIMIT=100
+      - LOCUST_LOAD_SCENARIO=soak
+      - LOCUST_SEARCH_MODE=lexical_vector_graph
+      - LOCUST_SEARCH_LIMIT=8
     depends_on:
       - api-lb
     profiles:

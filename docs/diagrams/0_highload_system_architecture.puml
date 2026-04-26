@@ -1,0 +1,100 @@
+@startuml
+' Highload system architecture with concrete technologies
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam wrapWidth 220
+skinparam maxMessageSize 200
+
+title Итоговая highload-архитектура системы
+
+actor "Клиенты\n(Web / CLI / External Services)" as client
+
+rectangle "Внешний контур" as edge {
+  [Search LB\n(Nginx / L7 LB)] as search_lb
+  [Indexer LB\n(Nginx / L7 LB)] as index_lb
+}
+
+rectangle "Search API pool\nPython / FastAPI" as search_api_pool {
+  [Search API #1] as search_api_1
+  [Search API #2] as search_api_2
+  [Search API #3] as search_api_3
+}
+
+rectangle "Indexer API pool\nPython / FastAPI" as index_api_pool {
+  [Indexer API #1] as index_api_1
+  [Indexer API #2] as index_api_2
+  [Indexer API #3] as index_api_3
+}
+
+rectangle "Inference layer" as inference {
+  [Embedder LB] as embedder_lb
+  [LLM LB] as llm_lb
+
+  rectangle "Embedder workers\nOllama" as embedder_pool {
+    [Embedder #1] as embedder_1
+    [Embedder #2] as embedder_2
+    [Embedder #3] as embedder_3
+  }
+
+  rectangle "LLM workers\nOllama" as llm_pool {
+    [LLM #1] as llm_1
+    [LLM #2] as llm_2
+    [LLM #3] as llm_3
+  }
+}
+
+rectangle "Data layer" as data {
+  rectangle "OpenSearch cluster" as os_cluster {
+    database "OpenSearch node #1" as os_1
+    database "OpenSearch node #2" as os_2
+    database "OpenSearch node #3" as os_3
+  }
+
+  rectangle "Neo4j cluster" as neo_cluster {
+    database "Neo4j core #1" as neo_1
+    database "Neo4j core #2" as neo_2
+    database "Neo4j core #3" as neo_3
+  }
+}
+
+' === Client traffic ===
+client --> search_lb : /v1/search, /v1/ask
+client --> index_lb : /v1/documents*
+
+search_lb --> search_api_1
+search_lb --> search_api_2
+search_lb --> search_api_3
+
+index_lb --> index_api_1
+index_lb --> index_api_2
+index_lb --> index_api_3
+
+' === Search path ===
+search_api_1 --> embedder_lb : query embedding
+search_api_1 --> os_1 : lexical / vector search
+search_api_1 --> neo_1 : graph context
+search_api_1 --> llm_lb : /v1/ask
+
+' === Indexing path ===
+index_api_1 --> embedder_lb : document embeddings
+index_api_1 --> os_1 : bulk index
+index_api_1 --> neo_1 : graph ingest
+
+' === Inference scaling ===
+embedder_lb --> embedder_1
+embedder_lb --> embedder_2
+embedder_lb --> embedder_3
+
+llm_lb --> llm_1
+llm_lb --> llm_2
+llm_lb --> llm_3
+
+' === Cluster internals ===
+os_1 --> os_2
+os_2 --> os_3
+
+neo_1 --> neo_2
+neo_2 --> neo_3
+
+@enduml

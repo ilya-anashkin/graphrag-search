@@ -8,10 +8,10 @@
   </head>
   <body>
     <main class="layout">
-      <section class="panel panel-left">
+      <section class="panel panel-settings">
         <header class="panel-header">
           <h1>Search Debug</h1>
-          <p>Поиск и выдача</p>
+          <p>Поисковые настройки</p>
         </header>
 
         <form id="search-form" class="controls">
@@ -19,46 +19,65 @@
             Query
             <input id="query" name="query" type="text" value="Про космос" required />
           </label>
-          <div class="row">
-            <label>
-              Limit
-              <input id="limit" name="limit" type="number" min="1" max="50" value="10" />
-            </label>
-            <label>
-              Lexical
-              <input id="lexical-weight" name="lexical_weight" type="number" min="0" max="1" step="0.1" value="0.6" />
-            </label>
-            <label>
-              Vector
-              <input id="vector-weight" name="vector_weight" type="number" min="0" max="1" step="0.1" value="0.4" />
-            </label>
-          </div>
+          <label>
+            Limit
+            <input id="limit" name="limit" type="number" min="1" max="50" value="10" />
+          </label>
+          <label>
+            Search Mode
+            <select id="search-mode" name="search_mode">
+              <option value="lexical">Lexical</option>
+              <option value="lexical_vector">Lexical + Vector</option>
+              <option value="lexical_vector_graph" selected>Lexical + Vector + Graph</option>
+            </select>
+          </label>
+          <label>
+            Lexical
+            <input id="lexical-weight" name="lexical_weight" type="number" min="0" max="1" step="0.1" value="0.6" />
+          </label>
+          <label>
+            Vector
+            <input id="vector-weight" name="vector_weight" type="number" min="0" max="1" step="0.1" value="0.4" />
+          </label>
           <div class="actions">
             <button type="submit" id="search-btn">Search</button>
             <button type="button" id="ask-btn">Ask Model</button>
           </div>
         </form>
+      </section>
 
-        <section class="block">
+      <section class="panel panel-results">
+        <header class="panel-header">
+          <h2>Search Response</h2>
+          <p>JSON-выдача поиска</p>
+          <div id="search-mode-indicator" class="mode-indicator">Mode: Lexical + Vector + Graph</div>
+          <div class="capabilities">
+            <div id="vector-indicator" class="capability capability-off">
+              <span class="capability-dot"></span>
+              <span>Vector</span>
+            </div>
+            <div id="graph-indicator" class="capability capability-off">
+              <span class="capability-dot"></span>
+              <span>Graph</span>
+            </div>
+          </div>
+        </header>
+
+        <section class="block block-fill">
           <div class="block-title">Search Response</div>
           <pre id="search-response" class="code"></pre>
         </section>
       </section>
 
-      <section class="panel panel-right">
+      <section class="panel panel-answer">
         <header class="panel-header">
           <h2>LLM Answer</h2>
           <p>Ответ модели по результатам поиска</p>
         </header>
 
-        <section class="block">
+        <section class="block block-fill">
           <div class="block-title">Answer</div>
           <pre id="llm-answer" class="code"></pre>
-        </section>
-
-        <section class="block">
-          <div class="block-title">Think (debug)</div>
-          <pre id="llm-think" class="code"></pre>
         </section>
       </section>
     </main>
@@ -66,4 +85,3 @@
     <script src="/ui/static/app.js"></script>
   </body>
 </html>
-

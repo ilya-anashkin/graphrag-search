@@ -276,6 +276,76 @@ async def test_service_hybrid_merge_with_weights() -> None:
     assert result[0].debug["combined_score"] == result[0].score
 
 
+async def test_search_mode_lexical_disables_vector_and_graph() -> None:
+    """Lexical mode should avoid vector search and graph enrichment."""
+
+    class NoVectorNoGraphOpenSearchAdapter(FakeOpenSearchAdapter):
+        async def vector_search(
+            self, query_vector: list[float], limit: int
+        ) -> list[dict[str, object]]:
+            raise AssertionError("vector_search must not be called in lexical mode")
+
+    class NoGraphNeo4jAdapter(FakeNeo4jAdapter):
+        async def fetch_graph_context(
+            self,
+            item_ids: list[str],
+            person_limit: int = 5,
+            related_limit: int = 3,
+            shared_people_limit: int = 5,
+        ) -> dict[str, dict[str, object]]:
+            raise AssertionError(
+                "fetch_graph_context must not be called in lexical mode"
+            )
+
+    settings = Settings(LEXICAL_SEARCH_WEIGHT=0.6, VECTOR_SEARCH_WEIGHT=0.4)
+    service = SearchService(
+        opensearch_adapter=NoVectorNoGraphOpenSearchAdapter(),
+        neo4j_adapter=NoGraphNeo4jAdapter(),
+        embedding_service=FakeEmbeddingService(),
+        llm_service=FakeLLMService(),
+        settings=settings,
+        domain_artifacts=build_domain_artifacts(),
+    )
+
+    result = await service.search(query="abc", limit=10, search_mode="lexical")
+
+    assert [item.id for item in result] == ["doc-1"]
+    assert "graph" not in result[0].payload
+    assert result[0].debug["vector"]["weight"] == 0.0
+
+
+async def test_search_mode_lexical_vector_disables_graph_only() -> None:
+    """Lexical+vector mode should keep vector search and skip graph enrichment."""
+
+    class NoGraphNeo4jAdapter(FakeNeo4jAdapter):
+        async def fetch_graph_context(
+            self,
+            item_ids: list[str],
+            person_limit: int = 5,
+            related_limit: int = 3,
+            shared_people_limit: int = 5,
+        ) -> dict[str, dict[str, object]]:
+            raise AssertionError(
+                "fetch_graph_context must not be called in lexical_vector mode"
+            )
+
+    settings = Settings(LEXICAL_SEARCH_WEIGHT=0.6, VECTOR_SEARCH_WEIGHT=0.4)
+    service = SearchService(
+        opensearch_adapter=FakeOpenSearchAdapter(),
+        neo4j_adapter=NoGraphNeo4jAdapter(),
+        embedding_service=FakeEmbeddingService(),
+        llm_service=FakeLLMService(),
+        settings=settings,
+        domain_artifacts=build_domain_artifacts(),
+    )
+
+    result = await service.search(query="abc", limit=10, search_mode="lexical_vector")
+
+    assert [item.id for item in result] == ["doc-1", "doc-2"]
+    assert "graph" not in result[0].payload
+    assert result[0].debug["vector"]["weight"] > 0.0
+
+
 async def test_index_document() -> None:
     """Service should index document with generated embedding."""
 
