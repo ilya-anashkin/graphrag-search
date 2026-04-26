@@ -54,6 +54,7 @@ async def search(
         limit=payload.limit,
         lexical_weight=payload.lexical_weight,
         vector_weight=payload.vector_weight,
+        search_mode=payload.search_mode,
     )
     return SearchResponse(request_id=request_id_context.get(), items=items)
 

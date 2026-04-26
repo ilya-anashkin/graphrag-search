@@ -39,7 +39,6 @@ end
 Service -> Service: normalize lexical scores (min-max)
 Service -> Service: normalize vector scores (min-max)
 Service -> Service: merge weighted results\n(build debug lexical/vector/combined)
-Service -> Service: filter lexical-only with vector_raw=0\nonly when vector channel is active
 Service -> Service: sort by combined score desc
 Service -> Service: take top limit
 

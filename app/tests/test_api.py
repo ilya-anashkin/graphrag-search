@@ -14,15 +14,22 @@ from app.models.schemas import SearchItem
 class FakeSearchService:
     """Fake service for API tests."""
 
+    def __init__(self) -> None:
+        """Track last search mode passed by API."""
+
+        self.last_search_mode: str | None = None
+
     async def search(
         self,
         query: str,
         limit: int,
         lexical_weight: float | None = None,
         vector_weight: float | None = None,
+        search_mode: str = "lexical_vector_graph",
     ) -> list[SearchItem]:
         """Return deterministic fake results."""
 
+        self.last_search_mode = search_mode
         return [
             SearchItem(
                 source="fake",
@@ -74,7 +81,9 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("EMBEDDING_PROVIDER", "hash")
     get_settings.cache_clear()
     app = create_app()
-    app.dependency_overrides[get_search_service] = lambda: FakeSearchService()
+    fake_service = FakeSearchService()
+    app.state.fake_search_service = fake_service
+    app.dependency_overrides[get_search_service] = lambda: fake_service
     return TestClient(app)
 
 
@@ -105,7 +114,11 @@ def test_ui_page(client: TestClient) -> None:
 def test_search(client: TestClient) -> None:
     """Verify search endpoint returns request id and results."""
 
-    payload: dict[str, Any] = {"query": "test", "limit": 1}
+    payload: dict[str, Any] = {
+        "query": "test",
+        "limit": 1,
+        "search_mode": "lexical_vector",
+    }
     response = client.post("/v1/search", json=payload)
 
     assert response.status_code == 200
@@ -114,6 +127,7 @@ def test_search(client: TestClient) -> None:
     assert len(data["items"]) == 1
     assert data["items"][0]["source"] == "fake"
     assert "debug" in data["items"][0]
+    assert client.app.state.fake_search_service.last_search_mode == "lexical_vector"
 
 
 def test_metrics_endpoint(client: TestClient) -> None:

@@ -207,11 +207,11 @@
         "fields": {
           "id": {
             "type": "string",
-            "description": "Уникальный идентификатор фильма в формате movie-<id>."
+            "description": "Уникальный идентификатор фильма."
           },
           "score": {
             "type": "float",
-            "description": "Итоговый комбинированный score (lexical + vector)."
+            "description": "Итоговый комбинированный score."
           },
           "payload": {
             "type": "object",
@@ -235,7 +235,7 @@
               },
               "rating_ball": {
                 "type": "float",
-                "description": "Оценка на kinopoisk.ru."
+                "description": "Оценка на kinopoisk."
               },
               "overview": {
                 "type": "string",

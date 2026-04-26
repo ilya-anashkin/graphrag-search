@@ -1,6 +1,6 @@
 """Request and response schemas."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,14 @@ class SearchRequest(BaseModel):
     )
     vector_weight: float | None = Field(
         default=None, ge=0.0, description="Vector score weight."
+    )
+    search_mode: Literal[
+        "lexical",
+        "lexical_vector",
+        "lexical_vector_graph",
+    ] = Field(
+        default="lexical_vector_graph",
+        description="Enabled search channels and graph enrichment mode.",
     )
 
 
